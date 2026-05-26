@@ -1,0 +1,296 @@
+import { useRef, useState } from 'react';
+import { CalculateEstimateButton } from './components/CalculateEstimateButton';
+import { ClarifyingQuestionsPanel } from './components/ClarifyingQuestionsPanel';
+import { ErrorAlert } from './components/ErrorAlert';
+import { EstimateSummary } from './components/EstimateSummary';
+import { LoadingState } from './components/LoadingState';
+import { RequirementReview } from './components/RequirementReview';
+import { RequirementTextInput } from './components/RequirementTextInput';
+import { AssumptionsPanel } from './components/AssumptionsPanel';
+import { createNaturalLanguageEstimate, extractRequirements, getApiErrorMessage, refineRequirements } from './lib/api';
+import type { NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement } from './types/estimate';
+
+const exampleRequirement = `I need 2 web servers with 4 vCPU and 16GB RAM each, running Linux Ubuntu.
+A managed PostgreSQL database with 8 vCPU and 32GB RAM, 500GB SSD storage.
+Redis cache with 2GB memory.
+A CDN for static assets, 1TB data transfer per month.
+Load balancer across both servers.
+All in US East region.`;
+
+function App() {
+  const [requirementText, setRequirementText] = useState(exampleRequirement);
+  const [requirements, setRequirements] = useState<NormalizedInfrastructureRequirement | null>(null);
+  const [extractedPrompt, setExtractedPrompt] = useState<string | null>(null);
+  const [estimate, setEstimate] = useState<NaturalLanguageEstimateResponse | null>(null);
+  const [loading, setLoading] = useState<'extract' | 'estimate' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const requirementTextRef = useRef(exampleRequirement);
+  const extractRequestRef = useRef(0);
+
+  const hasCurrentExtraction = Boolean(requirements && extractedPrompt === requirementText);
+  const hasEstimablePricing = Boolean(hasCurrentExtraction && requirements?.components.some(isEstimableComponent));
+
+  function handleRequirementTextChange(value: string) {
+    requirementTextRef.current = value;
+    setRequirementText(value);
+    setRequirements(null);
+    setExtractedPrompt(null);
+    setEstimate(null);
+    setError(null);
+  }
+
+  async function handleExtract() {
+    const promptSnapshot = requirementTextRef.current;
+    const requestId = extractRequestRef.current + 1;
+    extractRequestRef.current = requestId;
+    setLoading('extract');
+    setError(null);
+    setRequirements(null);
+    setExtractedPrompt(null);
+    setEstimate(null);
+
+    try {
+      const result = await extractRequirements(promptSnapshot);
+      if (requestId !== extractRequestRef.current || promptSnapshot !== requirementTextRef.current) {
+        return;
+      }
+      setRequirements(result);
+      setExtractedPrompt(promptSnapshot);
+    } catch (extractError) {
+      if (requestId !== extractRequestRef.current) {
+        return;
+      }
+      setError(getApiErrorMessage(extractError));
+    } finally {
+      if (requestId === extractRequestRef.current) {
+        setLoading(null);
+      }
+    }
+  }
+
+  async function handleEstimate() {
+    if (!requirements || !hasEstimablePricing) {
+      return;
+    }
+
+    setLoading('estimate');
+    setError(null);
+
+    try {
+      const result = await createNaturalLanguageEstimate({
+        provider: 'azure',
+        requirements
+      });
+      setEstimate(result);
+    } catch (estimateError) {
+      setError(getApiErrorMessage(estimateError));
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  function handleClarificationAnswer(question: string, clarification: string) {
+    const nextRequirementText = requirementText.includes(clarification) ? requirementText : `${requirementText.trim()}\n${clarification}`;
+    requirementTextRef.current = nextRequirementText;
+    setRequirementText(nextRequirementText);
+    setExtractedPrompt(nextRequirementText);
+    setRequirements((current) => (current ? applyClarification(current, question, clarification) : current));
+    setEstimate(null);
+  }
+
+  function handleComponentUpdate(componentId: string, updates: Record<string, unknown>) {
+    setRequirements((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const components = current.components.map((component) => {
+        if (component.id !== componentId) {
+          return component;
+        }
+
+        const missingFields = component.missingFields.filter((field) => !hasReviewValue(updates[field]));
+        return {
+          ...component,
+          ...updates,
+          missingFields,
+          pricingStatus:
+            component.pricingStatus === 'missing_required_fields' && missingFields.length === 0
+              ? component.type === 'compute'
+                ? 'supported'
+                : 'not_implemented'
+              : component.pricingStatus
+        };
+      });
+
+      return { ...current, components };
+    });
+    setEstimate(null);
+  }
+
+  return (
+    <main className="min-h-screen bg-mist text-ink">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <header className="overflow-hidden rounded-lg border border-slate-800 bg-navy px-5 py-5 shadow-command">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="h-1 w-12 rounded-full bg-teal" />
+              <h1 className="mt-3 text-2xl font-bold text-white">Cloud Cost Compare</h1>
+              <p className="mt-1 text-sm text-slate-300">Natural-language requirement extraction first. Azure pricing uses supported Retail Prices API meters.</p>
+            </div>
+            <span className="rounded-full border border-teal/30 bg-teal/15 px-3 py-1 text-xs font-semibold text-tealSoft">Requirement Review</span>
+          </div>
+        </header>
+
+        <div className="grid gap-6 lg:grid-cols-[430px_minmax(0,1fr)]">
+          <RequirementTextInput
+            value={requirementText}
+            loading={loading === 'extract'}
+            onChange={handleRequirementTextChange}
+            onExtract={handleExtract}
+            onRefine={refineRequirements}
+          />
+
+          <div className="space-y-5">
+            {error ? <ErrorAlert message={error} /> : null}
+            {loading ? <LoadingState /> : null}
+            {requirements ? (
+              <>
+                <RequirementReview requirements={requirements} onComponentUpdate={handleComponentUpdate} />
+                <ClarifyingQuestionsPanel questions={requirements.clarifyingQuestions} onAnswer={handleClarificationAnswer} />
+                <AssumptionsPanel assumptions={requirements.globalAssumptions} />
+                <CalculateEstimateButton
+                  loading={loading === 'estimate'}
+                  disabled={!hasEstimablePricing}
+                  onClick={handleEstimate}
+                />
+              </>
+            ) : (
+              <section className="rounded-lg border border-dashed border-line bg-panel p-8 text-center shadow-card">
+                <h2 className="text-lg font-semibold text-navy">Start with a requirement prompt</h2>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  The app will detect region and components before pricing. Unsupported services are kept visible for review.
+                </p>
+              </section>
+            )}
+            {estimate ? <EstimateSummary estimate={estimate} /> : null}
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default App;
+
+function hasReviewValue(value: unknown): boolean {
+  return value !== null && value !== undefined && value !== '';
+}
+
+function isEstimableComponent(component: NormalizedInfrastructureRequirement['components'][number]): boolean {
+  if (component.pricingStatus === 'missing_required_fields' || component.pricingStatus === 'unsupported' || component.pricingStatus === 'needs_review') {
+    return false;
+  }
+
+  if (component.type === 'compute') {
+    return component.pricingStatus === 'supported';
+  }
+
+  if (component.type === 'kubernetes') {
+    return typeof component.nodeCount === 'number' && typeof component.vcpuPerNode === 'number' && typeof component.memoryGbPerNode === 'number';
+  }
+
+  if (component.type === 'database') {
+    return (
+      component.engine === 'postgresql' &&
+      typeof component.vcpu === 'number' &&
+      typeof component.storageGb === 'number' &&
+      typeof component.highAvailability === 'boolean'
+    );
+  }
+
+  if (component.type === 'cache') {
+    return component.engine === 'redis' && typeof component.memoryGb === 'number' && typeof component.tier === 'string';
+  }
+
+  if (component.type === 'object_storage') {
+    return typeof component.dataStoredGb === 'number' && typeof component.accessTier === 'string' && typeof component.redundancy === 'string';
+  }
+
+  if (component.type === 'cdn') {
+    return typeof component.dataTransferGb === 'number' || typeof component.monthlyTransferGb === 'number' || typeof component.requestCount === 'number';
+  }
+
+  if (component.type === 'load_balancer') {
+    return component.scheme === 'http_s';
+  }
+
+  if (component.type === 'queue') {
+    return typeof component.tier === 'string' && typeof component.messageVolume === 'number';
+  }
+
+  if (component.type === 'monitoring') {
+    return typeof component.logIngestionGb === 'number';
+  }
+
+  if (component.type === 'network') {
+    return typeof component.monthlyEgressGb === 'number';
+  }
+
+  return false;
+}
+
+function applyClarification(
+  requirements: NormalizedInfrastructureRequirement,
+  question: string,
+  clarification: string
+): NormalizedInfrastructureRequirement {
+  const components = requirements.components.map((component) => {
+    if (question === 'Should PostgreSQL be highly available?' && component.type === 'database') {
+      const highAvailability = /:\s*yes/i.test(clarification);
+      const missingFields = component.missingFields.filter((field) => field !== 'highAvailability');
+      return {
+        ...component,
+        highAvailability,
+        missingFields,
+        pricingStatus: component.pricingStatus === 'missing_required_fields' && missingFields.length === 0 ? 'not_implemented' : component.pricingStatus
+      };
+    }
+
+    if (question === 'Should Redis be basic/dev or production-grade?' && component.type === 'cache') {
+      const tier = clarification.includes('production') ? 'production' : 'basic';
+      const missingFields = component.missingFields.filter((field) => field !== 'tier');
+      return {
+        ...component,
+        tier,
+        missingFields,
+        pricingStatus: component.pricingStatus === 'missing_required_fields' && missingFields.length === 0 ? 'not_implemented' : component.pricingStatus
+      };
+    }
+
+    if (question === 'Is the load balancer HTTP/S or TCP?' && component.type === 'load_balancer') {
+      const scheme = clarification.includes('HTTP/S') ? 'http_s' : 'tcp';
+      const azureService = scheme === 'http_s' ? 'Azure Application Gateway' : 'Azure Load Balancer';
+      const missingFields = component.missingFields.filter((field) => field !== 'scheme');
+      return {
+        ...component,
+        scheme,
+        azureService,
+        providerServiceHint: {
+          ...component.providerServiceHint,
+          azure: azureService
+        },
+        missingFields,
+        pricingStatus: component.pricingStatus === 'missing_required_fields' && missingFields.length === 0 ? 'not_implemented' : component.pricingStatus
+      };
+    }
+
+    return component;
+  });
+
+  return {
+    ...requirements,
+    components,
+    clarifyingQuestions: requirements.clarifyingQuestions.filter((candidate) => candidate !== question)
+  };
+}
