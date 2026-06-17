@@ -127,6 +127,78 @@ describe('RequirementPostProcessor', () => {
     expect(result.clarifyingQuestions).not.toContain('Should Redis be basic/dev or production-grade?');
   });
 
+  it('removes LLM components created from open-item checklist questions', () => {
+    const result = postProcessor.process(
+      `Azure Cost Estimation Request:
+
+Cache:
+- Azure Cache for Redis
+  - Memory Size: 2 GB
+
+Open items to complete before estimate:
+- Any monitoring or logging requirements
+- Data transfer details beyond CDN usage (Ingress/Egress)
+Redis tier: production.`,
+      {
+        ...baseRequirement({
+          id: 'cache-1',
+          type: 'cache',
+          name: 'Redis cache',
+          providerServiceHint: { azure: 'Azure Cache for Redis', aws: null, gcp: null },
+          pricingStatus: 'not_implemented',
+          confidence: 'high',
+          missingFields: ['tier'],
+          assumptions: [],
+          rawText: 'Azure Cache for Redis - Memory Size: 2 GB',
+          engine: 'redis',
+          memoryGb: 2,
+          tier: null
+        }),
+        components: [
+          {
+            id: 'cache-1',
+            type: 'cache',
+            name: 'Redis cache',
+            providerServiceHint: { azure: 'Azure Cache for Redis', aws: null, gcp: null },
+            pricingStatus: 'not_implemented',
+            confidence: 'high',
+            missingFields: ['tier'],
+            assumptions: [],
+            rawText: 'Azure Cache for Redis - Memory Size: 2 GB',
+            engine: 'redis',
+            memoryGb: 2,
+            tier: null
+          },
+          {
+            id: 'monitoring-1',
+            type: 'monitoring',
+            name: 'Azure Monitor',
+            providerServiceHint: { azure: 'Azure Monitor / Log Analytics', aws: null, gcp: null },
+            pricingStatus: 'not_implemented',
+            confidence: 'medium',
+            missingFields: ['logIngestionGb'],
+            assumptions: [],
+            rawText: 'Any monitoring or logging requirements'
+          },
+          {
+            id: 'network-1',
+            type: 'network',
+            name: 'Internet egress',
+            providerServiceHint: { azure: 'Azure Bandwidth', aws: null, gcp: null },
+            pricingStatus: 'not_implemented',
+            confidence: 'medium',
+            missingFields: ['monthlyEgressGb'],
+            assumptions: [],
+            rawText: 'Data transfer details beyond CDN usage (Ingress/Egress)'
+          }
+        ]
+      }
+    );
+
+    expect(result.components.map((candidate) => candidate.type)).toEqual(['cache']);
+    expect(result.components[0]).toMatchObject({ tier: 'production', missingFields: [] });
+  });
+
   it('sets Redis tier basic from UI clarification text', () => {
     const result = postProcessor.process(
       'Redis cache with 2GB memory. Redis tier: basic.',

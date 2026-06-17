@@ -6,6 +6,7 @@ import type {
   NormalizedComponent,
   NormalizedInfrastructureRequirement
 } from '../types/estimate.types.js';
+import { pricingIntentText } from './RequirementTextUtils.js';
 
 const postgresHaQuestion = 'Should PostgreSQL be highly available?';
 const redisTierQuestion = 'Should Redis be basic/dev or production-grade?';
@@ -20,7 +21,8 @@ interface NormalizedText {
 export class RequirementPostProcessor {
   process(requirementText: string, requirement: NormalizedInfrastructureRequirement): NormalizedInfrastructureRequirement {
     const normalized = this.normalizeText(requirementText);
-    const components = this.ensureDetectedComponents(this.removeImplicitBackupComponents(requirement.components, normalized), normalized).map((component) =>
+    const inputComponents = this.removeOpenItemPlaceholderComponents(requirement.components);
+    const components = this.ensureDetectedComponents(this.removeImplicitBackupComponents(inputComponents, normalized), normalized).map((component) =>
       this.processComponent(component, normalized)
     );
 
@@ -323,13 +325,42 @@ export class RequirementPostProcessor {
   }
 
   private normalizeText(input: string): NormalizedText {
-    const rawLower = input.toLowerCase();
+    const rawLower = pricingIntentText(input).toLowerCase();
     const compact = rawLower.replace(/\s+/g, ' ').trim();
     return {
       rawLower,
       compact,
       wordsOnly: rawLower.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim()
     };
+  }
+
+  private removeOpenItemPlaceholderComponents(components: NormalizedComponent[]): NormalizedComponent[] {
+    return components.filter((component) => !this.isOpenItemPlaceholderComponent(component));
+  }
+
+  private isOpenItemPlaceholderComponent(component: NormalizedComponent): boolean {
+    const rawText = component.rawText.toLowerCase();
+    const hasConcreteData = /\b\d+(?:\.\d+)?\s*(tb|gb|days?|hours?|million|messages?)\b/i.test(rawText);
+
+    if (component.type === 'monitoring') {
+      return (
+        /\bany\s+monitoring\s+or\s+logging\s+requirements\b/i.test(rawText) ||
+        (/\b(monitoring|logging)\b/i.test(rawText) &&
+          /\b(any|requirements?|not specified|unspecified|specify|confirm|clarify)\b/i.test(rawText) &&
+          !hasConcreteData)
+      );
+    }
+
+    if (component.type === 'network') {
+      return (
+        /\bdata transfer details beyond cdn usage\b/i.test(rawText) ||
+        (/\b(egress|ingress)\b/i.test(rawText) &&
+          /\b(details|requirements?|not specified|unspecified|specify|confirm|clarify)\b/i.test(rawText) &&
+          !hasConcreteData)
+      );
+    }
+
+    return false;
   }
 
   private containsAny(texts: string[], patterns: RegExp[]): boolean {

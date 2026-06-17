@@ -95,6 +95,66 @@ They will run 730 hours per month.`
     expect(compute.missingFields).toEqual([]);
   });
 
+  it('ignores open-item checklist questions while keeping answered clarifications', () => {
+    const result = service.extractRequirements(`Azure Cost Estimation Request:
+
+Compute:
+- Azure Virtual Machines
+  - Quantity: 2
+  - vCPU: 4 each
+  - RAM: 16 GB each
+  - Operating System: Linux Ubuntu
+  - Region: US East
+
+Database:
+- Azure Database for PostgreSQL Flexible Server
+  - vCPU: 8
+  - RAM: 32 GB
+  - Storage: 500 GB SSD
+  - Region: US East
+
+Cache:
+- Azure Cache for Redis
+  - Memory Size: 2 GB
+  - Region: US East
+
+Content Delivery Network:
+- Azure CDN
+  - Data Transfer: 1 TB per month
+  - Region: US East
+
+Load Balancing:
+- Azure Load Balancer (or Azure Application Gateway if HTTP/S specified)
+  - Backend pool: 2 web servers
+  - Region: US East
+
+Open items to complete before estimate:
+- Load balancer type (Basic, Standard, Application Gateway) and SKU
+- Pricing model (Reserved, Pay-as-you-go, etc.) for VMs and Database
+- Backup/High availability requirements for database and cache
+- Any monitoring or logging requirements
+- Data transfer details beyond CDN usage (Ingress/Egress)
+Redis tier: production.`);
+
+    const types = result.components.map((candidate) => candidate.type);
+    const compute = result.components.find((candidate) => candidate.type === 'compute') as ComputeComponent;
+    const database = result.components.find((candidate) => candidate.type === 'database') as DatabaseComponent;
+    const cache = result.components.find((candidate) => candidate.type === 'cache') as CacheComponent;
+    const cdn = result.components.find((candidate) => candidate.type === 'cdn') as CdnComponent;
+    const loadBalancer = result.components.find((candidate) => candidate.type === 'load_balancer') as LoadBalancerComponent;
+
+    expect(types).toEqual(expect.arrayContaining(['compute', 'database', 'cache', 'cdn', 'load_balancer']));
+    expect(types).not.toContain('monitoring');
+    expect(types).not.toContain('network');
+    expect(compute.quantity).toBe(2);
+    expect(cache.tier).toBe('production');
+    expect(cdn.dataTransferGb).toBe(1024);
+    expect(database.highAvailability).toBeNull();
+    expect(database.missingFields).toContain('highAvailability');
+    expect(loadBalancer.scheme).toBeNull();
+    expect(loadBalancer.missingFields).toContain('scheme');
+  });
+
   it('does not create standalone compute from AKS or managed service server wording', () => {
     const result = service.extractRequirements(`Azure Kubernetes Service (AKS)
 - Cluster size: 4 Linux worker nodes

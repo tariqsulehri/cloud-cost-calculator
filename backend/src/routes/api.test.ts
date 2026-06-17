@@ -73,6 +73,59 @@ describe('api routes', () => {
     expect(response.body).toContainEqual({ name: 'East US', value: 'eastus' });
   });
 
+  it('GET /api/catalog/services returns database-backed service mappings', async () => {
+    const response = await invoke('GET', '/api/catalog/services?provider=azure&q=redis');
+
+    expect(response.status).toBe(200);
+    expect(response.body.services).toHaveLength(1);
+    expect(response.body.services[0]).toMatchObject({
+      serviceKey: 'cache.redis',
+      providerId: 'azure',
+      canonicalName: 'Azure Cache for Redis',
+      requiredFields: ['engine', 'memoryGb', 'tier']
+    });
+  });
+
+  it('POST /api/catalog/sync/azure-retail-prices syncs Azure meter metadata', async () => {
+    nock('https://prices.azure.com')
+      .get('/api/retail/prices')
+      .query(true)
+      .reply(200, {
+        Items: [
+          {
+            currencyCode: 'USD',
+            armRegionName: 'eastus',
+            serviceName: 'Virtual Machines',
+            serviceFamily: 'Compute',
+            productName: 'Virtual Machines Dsv5 Series',
+            skuName: 'D4s v5',
+            armSkuName: 'Standard_D4s_v5',
+            meterId: 'meter-1',
+            meterName: 'D4s v5',
+            unitOfMeasure: '1 Hour',
+            priceType: 'Consumption',
+            retailPrice: 0.192,
+            unitPrice: 0.192
+          }
+        ],
+        NextPageLink: null
+      });
+
+    const response = await invoke('POST', '/api/catalog/sync/azure-retail-prices', {
+      armRegionName: 'eastus',
+      serviceName: 'Virtual Machines',
+      maxPages: 1
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'completed',
+      pagesFetched: 1,
+      itemsFetched: 1,
+      rowsUpserted: 1
+    });
+  });
+
   it('POST /api/requirements/extract works for the example prompt', async () => {
     const response = await invoke('POST', '/api/requirements/extract', { requirementText: examplePrompt });
 

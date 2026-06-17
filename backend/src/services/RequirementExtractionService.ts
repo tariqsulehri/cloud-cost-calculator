@@ -7,6 +7,7 @@ import type {
   LoadBalancerComponent,
   NormalizedInfrastructureRequirement
 } from '../types/estimate.types.js';
+import { pricingIntentText } from './RequirementTextUtils.js';
 
 interface NormalizedText {
   rawLower: string;
@@ -91,12 +92,13 @@ export class RequirementExtractionService {
       return null;
     }
 
-    const quantity = this.numberBefore(text, /(web servers|web server|servers|server|vms|virtual machines)/) ?? this.numberNearComputeNoun(text);
-    const vcpu = this.numberBefore(text, /(vcpu|vcpus|cpu|cpus)/);
-    const memoryGb = this.numberBefore(text, /(gb ram|gb memory|gib ram|gib memory)/);
-    const operatingSystem = text.includes('linux') ? 'linux' : null;
-    const imageType = text.includes('ubuntu') ? 'ubuntu' : null;
-    const monthlyHours = this.monthlyHours(text) ?? 730;
+    const computeSegment = this.segmentFrom(text, /(azure virtual machines|virtual machines?|web servers?|app servers?|application servers?|api servers?|vms)/);
+    const quantity = this.numberBefore(text, /(web servers|web server|servers|server|vms|virtual machines)/) ?? this.numberNearComputeNoun(text) ?? this.quantityLabel(computeSegment);
+    const vcpu = this.numberBefore(computeSegment, /(vcpu|vcpus|cpu|cpus)/) ?? this.numberBefore(text, /(vcpu|vcpus|cpu|cpus)/);
+    const memoryGb = this.numberBefore(computeSegment, /(gb ram|gb memory|gib ram|gib memory)/) ?? this.numberBefore(text, /(gb ram|gb memory|gib ram|gib memory)/);
+    const operatingSystem = computeSegment.includes('linux') || text.includes('linux') ? 'linux' : null;
+    const imageType = computeSegment.includes('ubuntu') || text.includes('ubuntu') ? 'ubuntu' : null;
+    const monthlyHours = this.monthlyHours(computeSegment) ?? this.monthlyHours(text) ?? 730;
 
     const missingFields = [
       quantity ? undefined : 'quantity',
@@ -116,8 +118,8 @@ export class RequirementExtractionService {
         gcp: 'Compute Engine'
       },
       pricingStatus: missingFields.length === 0 ? 'supported' : 'missing_required_fields',
-      rawText: text,
-      role: text.includes('web') ? 'web servers' : null,
+      rawText: computeSegment,
+      role: computeSegment.includes('web') || text.includes('web') ? 'web servers' : null,
       quantity,
       vcpu,
       memoryGb,
@@ -463,6 +465,11 @@ export class RequirementExtractionService {
     return match ? Number(match[1]) : null;
   }
 
+  private quantityLabel(text: string): number | null {
+    const match = text.match(/\b(?:quantity|qty|count|number of (?:vms|virtual machines|servers))\s*:?\s*(\d+(?:\.\d+)?)/i);
+    return match ? Number(match[1]) : null;
+  }
+
   private hasStandaloneComputeIntent(text: string): boolean {
     const vmsIsOnlyAksNodeDescriptor =
       /\b(worker node|worker nodes|aks|kubernetes).{0,80}\bvms\b/i.test(text) && !/\b(virtual machines?|web servers?|app servers?|application servers?|api servers?)\b/i.test(text);
@@ -492,26 +499,13 @@ export class RequirementExtractionService {
   }
 
   private normalizeText(input: string): NormalizedText {
-    const rawLower = this.promptIntentText(input).toLowerCase();
+    const rawLower = pricingIntentText(input).toLowerCase();
     const compact = rawLower.replace(/\s+/g, ' ').trim();
     return {
       rawLower,
       compact,
       wordsOnly: rawLower.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim()
     };
-  }
-
-  private promptIntentText(input: string): string {
-    const promptMatch = input.match(/\bprompt\s*:\s*/i);
-    if (!promptMatch || promptMatch.index === undefined) {
-      return input;
-    }
-
-    const beforePrompt = input.slice(0, promptMatch.index).trim();
-    const afterPrompt = input.slice(promptMatch.index + promptMatch[0].length);
-    const resultIndex = afterPrompt.search(/\bresult\s*:\s*/i);
-    const promptBody = (resultIndex >= 0 ? afterPrompt.slice(0, resultIndex) : afterPrompt).trim();
-    return [beforePrompt, promptBody].filter(Boolean).join('\n');
   }
 
   private containsAny(texts: string[], patterns: RegExp[]): boolean {

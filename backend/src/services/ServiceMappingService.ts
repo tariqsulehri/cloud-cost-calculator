@@ -1,8 +1,11 @@
+import { CloudCatalogDatabase, type ProviderServiceHints } from '../database/CloudCatalogDatabase.js';
 import type { NormalizedComponent, NormalizedComponentType, NormalizedInfrastructureRequirement } from '../types/estimate.types.js';
 
 type ProviderServiceHint = NormalizedComponent['providerServiceHint'];
 
 export class ServiceMappingService {
+  constructor(private readonly catalog = new CloudCatalogDatabase()) {}
+
   mapRequirement(requirement: NormalizedInfrastructureRequirement): NormalizedInfrastructureRequirement {
     const components = requirement.components.map((component) => this.mapComponent(component));
     return {
@@ -28,6 +31,11 @@ export class ServiceMappingService {
   }
 
   private providerServiceHint(component: NormalizedComponent): ProviderServiceHint {
+    const catalogHints = this.catalogProviderServiceHint(component);
+    if (catalogHints) {
+      return catalogHints;
+    }
+
     if (component.type === 'database' && 'engine' in component && component.engine === 'postgresql') {
       return {
         azure: 'Azure Database for PostgreSQL Flexible Server',
@@ -151,6 +159,40 @@ export class ServiceMappingService {
     };
 
     return hints[component.type];
+  }
+
+  private catalogProviderServiceHint(component: NormalizedComponent): ProviderServiceHints | null {
+    try {
+      return this.catalog.providerHintsForServiceKey(this.serviceKeyForComponent(component));
+    } catch {
+      return null;
+    }
+  }
+
+  private serviceKeyForComponent(component: NormalizedComponent): string {
+    if (component.type === 'database' && 'engine' in component && component.engine === 'postgresql') {
+      return 'database.postgresql';
+    }
+
+    if (component.type === 'cache' && 'engine' in component && component.engine === 'redis') {
+      return 'cache.redis';
+    }
+
+    if (component.type === 'load_balancer' && 'scheme' in component) {
+      if (component.scheme === 'http_s') {
+        return 'load_balancer.http_s';
+      }
+      if (component.scheme === 'tcp') {
+        return 'load_balancer.tcp';
+      }
+      return 'load_balancer.generic';
+    }
+
+    if (component.type === 'network') {
+      return 'network.egress';
+    }
+
+    return component.type;
   }
 
   private defaultName(component: NormalizedComponent): string {

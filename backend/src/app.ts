@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import { azureRouter } from './routes/azure.routes.js';
+import { catalogRouter } from './routes/catalog.routes.js';
 import { estimateRouter } from './routes/estimate.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { createRequirementsRouter, type RequirementExtractor } from './routes/requirements.routes.js';
@@ -33,6 +34,7 @@ export function createApp(services: AppServices = {}) {
 
   app.use('/api', healthRouter);
   app.use('/api', azureRouter);
+  app.use('/api', catalogRouter);
   app.use('/api', createRequirementsRouter(services.requirementExtractionService));
   app.use('/api', estimateRouter);
   app.use(errorHandler);

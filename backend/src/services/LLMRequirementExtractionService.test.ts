@@ -182,11 +182,11 @@ describe('LLMRequirementExtractionService', () => {
 
     expect(compute).toMatchObject({
       pricingStatus: 'supported',
-      providerServiceHint: { azure: 'Virtual Machines', aws: 'EC2', gcp: 'Compute Engine' }
+      providerServiceHint: { azure: 'Azure Virtual Machines', aws: 'Amazon EC2', gcp: 'Compute Engine' }
     });
     expect(queue).toMatchObject({
       pricingStatus: 'not_implemented',
-      providerServiceHint: { azure: 'Azure Service Bus', aws: 'Amazon SQS', gcp: 'Pub/Sub' }
+      providerServiceHint: { azure: 'Azure Service Bus', aws: 'Amazon SQS / Amazon EventBridge', gcp: 'Pub/Sub' }
     });
     expect(result.globalAssumptions).toContain('Backend service mapping is authoritative; OpenAI extracts requirements only and does not calculate prices.');
   });
