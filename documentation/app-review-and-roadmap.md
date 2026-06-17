@@ -279,6 +279,8 @@ Frontend:
 - TypeScript
 - Vite
 - Tailwind CSS
+- shadcn/ui-style local components
+- Radix UI primitives
 - Lucide icons
 - Vitest and Testing Library
 

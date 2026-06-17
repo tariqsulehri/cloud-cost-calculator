@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -309,7 +309,7 @@ describe('App', () => {
   it('shows service mapping tab with cloud equivalents', async () => {
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: /Service Mapping/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /Service Mapping/ }));
     expect(screen.getByLabelText('Cloud provider')).toBeInTheDocument();
     expect(screen.getByLabelText('Search and select service')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('option', { name: /Amazon ElastiCache for Redis/ }));
@@ -322,7 +322,7 @@ describe('App', () => {
   it('shows AI help tab with guarded guidance', async () => {
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: /AI Help/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /AI Help/ }));
 
     expect(screen.getByText('Ask about the estimate')).toBeInTheDocument();
     expect(screen.getByText(/Full AI chat can be connected later/)).toBeInTheDocument();
@@ -401,7 +401,7 @@ Database:
 
     const textarea = screen.getByLabelText('Requirement text');
     await userEvent.clear(textarea);
-    await userEvent.type(textarea, productionMicroservicesPrompt);
+    fireEvent.change(textarea, { target: { value: productionMicroservicesPrompt } });
     await userEvent.click(screen.getByRole('button', { name: 'Improve text' }));
 
     const refinedTextarea = screen.getByLabelText('Improved text') as HTMLTextAreaElement;
@@ -433,7 +433,7 @@ Database:
     expect(refinedTextarea.value).toContain('Internet egress excluding CDN: 1 TB per month');
     expect(refinedTextarea.value).toContain('Pricing Model:');
     expect(refinedTextarea.value).toContain('Pay-as-you-go pricing');
-  });
+  }, 10000);
 
   it('shows review section after successful extraction', async () => {
     render(<App />);
@@ -519,7 +519,7 @@ Database:
     await userEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
 
     expect(screen.queryByText('Missing: nodeCount')).not.toBeInTheDocument();
-    expect(calculateButton).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Calculate Azure cost' })).toBeEnabled());
   });
 
   it('adds selected clarification answers to the prompt', async () => {

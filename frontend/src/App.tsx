@@ -12,6 +12,7 @@ import { RequirementReview } from './components/RequirementReview';
 import { RequirementTextInput } from './components/RequirementTextInput';
 import { AssumptionsPanel } from './components/AssumptionsPanel';
 import { ServiceMappingTab } from './components/ServiceMappingTab';
+import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs';
 import { createNaturalLanguageEstimate, extractRequirements, getApiErrorMessage, refineRequirements } from './lib/api';
 import type { NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement } from './types/estimate';
 
@@ -186,31 +187,22 @@ function App() {
           <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={Boolean(estimate)} />
         </div>
 
-        <nav className="grid gap-2 rounded-md border border-line bg-white p-1.5 shadow-card md:grid-cols-3" aria-label="Workspace tabs">
-          {workspaceTabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = workspaceTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setWorkspaceTab(tab.key)}
-                className={`flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-left transition ${
-                  isActive
-                    ? 'border-azure bg-blue-50 text-azure shadow-sm'
-                    : 'border-transparent bg-white text-graphite hover:border-slate-200 hover:bg-slate-50'
-                }`}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon className="h-4 w-4 flex-none" aria-hidden="true" />
-                <span>
-                  <span className="block text-xs font-bold">{tab.label}</span>
-                  <span className="mt-0.5 block text-[11px] leading-4 text-muted">{tab.helper}</span>
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+        <Tabs value={workspaceTab} onValueChange={(value) => setWorkspaceTab(value as WorkspaceTab)}>
+          <TabsList className="grid w-full grid-cols-3">
+            {workspaceTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger key={tab.key} value={tab.key} className="justify-start px-3">
+                  <Icon className="h-4 w-4 flex-none" aria-hidden="true" />
+                  <span className="min-w-0 text-left">
+                    <span className="block truncate">{tab.label}</span>
+                    <span className="block truncate text-[10px] font-medium text-muted">{tab.helper}</span>
+                  </span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
 
         {workspaceTab === 'estimate' ? (
           <div className="grid gap-3 lg:grid-cols-[390px_minmax(0,1fr)]">
