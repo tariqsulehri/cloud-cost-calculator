@@ -25,8 +25,8 @@ export function RequirementReview({ requirements, onComponentUpdate }: Requireme
       <div className="border-b border-line bg-slate-50 px-5 py-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-navy">Step 2: Review Detected Requirements</h2>
-            <p className="mt-1 text-sm text-muted">Confirm extracted Azure services before calculation. Expand rows to inspect evidence and assumptions.</p>
+            <h2 className="text-lg font-semibold text-navy">Step 2: Review services</h2>
+            <p className="mt-1 text-sm text-muted">Check each service. Add missing values before cost calculation.</p>
           </div>
           <InfoBadge
             label={extractionLabel}
@@ -54,7 +54,7 @@ export function RequirementReview({ requirements, onComponentUpdate }: Requireme
 
       <div className="px-5 py-5">
         <div className="rounded-lg border border-teal/20 bg-teal/5 px-4 py-3 text-sm text-slate-800">
-          Cloud focus: Azure pricing only. Unsupported and not implemented services are detected for review, but excluded from the estimate total.
+          Azure pricing is active now. Services marked Need info, Price not ready, or Can't price are not included in the total.
         </div>
         <ComponentGroup
           title="Supported for pricing"

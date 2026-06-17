@@ -4,6 +4,8 @@ import { ClarifyingQuestionsPanel } from './components/ClarifyingQuestionsPanel'
 import { ErrorAlert } from './components/ErrorAlert';
 import { EstimateSummary } from './components/EstimateSummary';
 import { LoadingState } from './components/LoadingState';
+import { ProcessRail } from './components/ProcessRail';
+import { ProviderTabs } from './components/ProviderTabs';
 import { RequirementReview } from './components/RequirementReview';
 import { RequirementTextInput } from './components/RequirementTextInput';
 import { AssumptionsPanel } from './components/AssumptionsPanel';
@@ -134,13 +136,18 @@ function App() {
         <header className="overflow-hidden rounded-lg border border-slate-800 bg-navy px-5 py-5 shadow-command">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="h-1 w-12 rounded-full bg-teal" />
-              <h1 className="mt-3 text-2xl font-bold text-white">Cloud Cost Compare</h1>
-              <p className="mt-1 text-sm text-slate-300">Natural-language requirement extraction first. Azure pricing uses supported Retail Prices API meters.</p>
+              <div className="h-1 w-12 rounded-full bg-tealSoft" />
+              <h1 className="mt-3 text-2xl font-bold text-white">Cloud Cost Calculator</h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">
+                Review infrastructure needs, fix missing details, and calculate cloud cost. Azure pricing is active now; AWS, GCP, and combined comparison are planned from the service mapping.
+              </p>
             </div>
-            <span className="rounded-full border border-teal/30 bg-teal/15 px-3 py-1 text-xs font-semibold text-tealSoft">Requirement Review</span>
+            <span className="rounded-full border border-tealSoft/30 bg-tealSoft/10 px-3 py-1 text-xs font-semibold text-tealSoft">FinOps review workspace</span>
           </div>
         </header>
+
+        <ProviderTabs />
+        <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={Boolean(estimate)} />
 
         <div className="grid gap-6 lg:grid-cols-[430px_minmax(0,1fr)]">
           <RequirementTextInput
@@ -167,9 +174,9 @@ function App() {
               </>
             ) : (
               <section className="rounded-lg border border-dashed border-line bg-panel p-8 text-center shadow-card">
-                <h2 className="text-lg font-semibold text-navy">Start with a requirement prompt</h2>
+                <h2 className="text-lg font-semibold text-navy">Start by finding services</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">
-                  The app will detect region and components before pricing. Unsupported services are kept visible for review.
+                  Paste the requirement on the left, then click Find services. The app will show what can be priced and what needs more information.
                 </p>
               </section>
             )}

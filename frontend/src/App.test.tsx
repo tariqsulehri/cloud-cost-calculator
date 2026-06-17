@@ -241,14 +241,14 @@ describe('App', () => {
   it('renders requirement textarea', () => {
     render(<App />);
 
-    expect(screen.getByLabelText('Your actual prompt')).toBeInTheDocument();
+    expect(screen.getByLabelText('Requirement text')).toBeInTheDocument();
   });
 
-  it('renders Extract Requirements button', () => {
+  it('renders Find services button', () => {
     render(<App />);
 
-    expect(screen.getByRole('button', { name: 'Extract Requirements' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Review / refine prompt' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Find services' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Improve text' })).toBeInTheDocument();
   });
 
   it('shows a refined prompt below and lets the user use it for extraction', async () => {
@@ -264,14 +264,14 @@ CDN:
 - Monthly transfer: 1 TB`);
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Review / refine prompt' }));
-    const refinedTextarea = screen.getByLabelText('Refined prompt') as HTMLTextAreaElement;
+    await userEvent.click(screen.getByRole('button', { name: 'Improve text' }));
+    const refinedTextarea = screen.getByLabelText('Improved text') as HTMLTextAreaElement;
     expect(refinedTextarea.value).toContain('2 virtual machines');
     expect(refinedTextarea.value).toContain('Managed PostgreSQL');
     expect(refinedTextarea.value).toContain('Monthly transfer: 1 TB');
     expect(refinedTextarea.value).not.toContain('High availability: yes');
-    await userEvent.click(screen.getByRole('button', { name: 'Use completed prompt for extraction' }));
-    const textarea = screen.getByLabelText('Your actual prompt') as HTMLTextAreaElement;
+    await userEvent.click(screen.getByRole('button', { name: 'Use improved text' }));
+    const textarea = screen.getByLabelText('Requirement text') as HTMLTextAreaElement;
 
     expect(textarea.value).toContain('2 virtual machines');
     expect(textarea.value).toContain('Managed PostgreSQL');
@@ -281,7 +281,7 @@ CDN:
     vi.mocked(refineRequirements).mockRejectedValueOnce(new Error('fallback to local refine'));
     render(<App />);
 
-    const textarea = screen.getByLabelText('Your actual prompt');
+    const textarea = screen.getByLabelText('Requirement text');
     await userEvent.clear(textarea);
     await userEvent.type(
       textarea,
@@ -305,8 +305,8 @@ Database:
 - Managed PostgreSQL`
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Review / refine prompt' }));
-    const refinedTextarea = screen.getByLabelText('Refined prompt') as HTMLTextAreaElement;
+    await userEvent.click(screen.getByRole('button', { name: 'Improve text' }));
+    const refinedTextarea = screen.getByLabelText('Improved text') as HTMLTextAreaElement;
 
     expect(refinedTextarea.value).toContain('3 virtual machines');
     expect(refinedTextarea.value).toContain('Each VM: 2 vCPU, 8 GB RAM');
@@ -322,12 +322,12 @@ Database:
     vi.mocked(refineRequirements).mockRejectedValueOnce(new Error('fallback to local refine'));
     render(<App />);
 
-    const textarea = screen.getByLabelText('Your actual prompt');
+    const textarea = screen.getByLabelText('Requirement text');
     await userEvent.clear(textarea);
     await userEvent.type(textarea, productionMicroservicesPrompt);
-    await userEvent.click(screen.getByRole('button', { name: 'Review / refine prompt' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Improve text' }));
 
-    const refinedTextarea = screen.getByLabelText('Refined prompt') as HTMLTextAreaElement;
+    const refinedTextarea = screen.getByLabelText('Improved text') as HTMLTextAreaElement;
     expect(refinedTextarea.value).toContain('Azure Service Dictionary:');
     expect(refinedTextarea.value).toContain('Kubernetes -> Azure Kubernetes Service (AKS)');
     expect(refinedTextarea.value).toContain('Kubernetes:');
@@ -361,28 +361,28 @@ Database:
   it('shows review section after successful extraction', async () => {
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
 
-    expect(await screen.findByText('Step 2: Review Detected Requirements')).toBeInTheDocument();
+    expect(await screen.findByText('Step 2: Review services')).toBeInTheDocument();
     expect(screen.getByText('AI-assisted')).toBeInTheDocument();
     expect(screen.getByText('Azure region')).toBeInTheDocument();
     expect(screen.getByText('eastus')).toBeInTheDocument();
-    expect(screen.getByText(/Cloud focus: Azure pricing only/)).toBeInTheDocument();
+    expect(screen.getByText("Azure pricing is active now. Services marked Need info, Price not ready, or Can't price are not included in the total.")).toBeInTheDocument();
     expect(screen.getByText('database')).toBeInTheDocument();
   });
 
   it('clears stale extracted requirements when the prompt changes', async () => {
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
-    expect(await screen.findByText('Step 2: Review Detected Requirements')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    expect(await screen.findByText('Step 2: Review services')).toBeInTheDocument();
 
-    const textarea = screen.getByLabelText('Your actual prompt');
+    const textarea = screen.getByLabelText('Requirement text');
     await userEvent.clear(textarea);
     await userEvent.type(textarea, 'I need 3 Linux Ubuntu virtual machines in East US.');
 
-    expect(screen.queryByText('Step 2: Review Detected Requirements')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Calculate Azure Estimate' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Step 2: Review services')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Calculate Azure cost' })).not.toBeInTheDocument();
   });
 
   it('ignores extraction results that return after the prompt changed', async () => {
@@ -394,48 +394,48 @@ Database:
     );
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
-    const textarea = screen.getByLabelText('Your actual prompt');
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    const textarea = screen.getByLabelText('Requirement text');
     await userEvent.clear(textarea);
     await userEvent.type(textarea, 'I need 3 Linux Ubuntu virtual machines in East US.');
     resolveExtraction(extractedRequirements);
 
-    await waitFor(() => expect(screen.queryByText('Step 2: Review Detected Requirements')).not.toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'Calculate Azure Estimate' })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Step 2: Review services')).not.toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Calculate Azure cost' })).not.toBeInTheDocument();
   });
 
-  it('renders Calculate Azure Estimate button after extraction', async () => {
+  it('renders Calculate Azure cost button after extraction', async () => {
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
 
-    expect(await screen.findByRole('button', { name: 'Calculate Azure Estimate' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Calculate Azure cost' })).toBeInTheDocument();
   });
 
-  it('enables Calculate Azure Estimate for AKS worker node compute', async () => {
+  it('enables Calculate Azure cost for AKS worker node compute', async () => {
     vi.mocked(extractRequirements).mockResolvedValueOnce(extractedKubernetesRequirements);
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
 
-    expect(await screen.findByRole('button', { name: 'Calculate Azure Estimate' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Calculate Azure cost' })).toBeEnabled();
   });
 
-  it('enables Calculate Azure Estimate for non-compute services with pricing adapters', async () => {
+  it('enables Calculate Azure cost for non-compute services with pricing adapters', async () => {
     vi.mocked(extractRequirements).mockResolvedValueOnce(extractedCacheOnlyRequirements);
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
 
-    expect(await screen.findByRole('button', { name: 'Calculate Azure Estimate' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Calculate Azure cost' })).toBeEnabled();
   });
 
   it('lets users fill missing AKS node count inline and enables estimate', async () => {
     vi.mocked(extractRequirements).mockResolvedValueOnce(extractedKubernetesMissingNodeCount);
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
-    const calculateButton = await screen.findByRole('button', { name: 'Calculate Azure Estimate' });
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    const calculateButton = await screen.findByRole('button', { name: 'Calculate Azure cost' });
     expect(calculateButton).toBeDisabled();
 
     await userEvent.type(screen.getByLabelText('Node count'), '4');
@@ -448,11 +448,11 @@ Database:
   it('adds selected clarification answers to the prompt', async () => {
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
     expect(await screen.findByText('Should PostgreSQL be highly available?')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'Yes, highly available' }));
 
-    const textarea = screen.getByLabelText('Your actual prompt') as HTMLTextAreaElement;
+    const textarea = screen.getByLabelText('Requirement text') as HTMLTextAreaElement;
     expect(textarea.value).toContain('PostgreSQL high availability: yes.');
     expect(screen.queryByText('Should PostgreSQL be highly available?')).not.toBeInTheDocument();
     expect(screen.getByText('Yes')).toBeInTheDocument();
@@ -462,7 +462,7 @@ Database:
     vi.mocked(extractRequirements).mockResolvedValueOnce(extractedWithMissingStorage);
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
     expect(await screen.findByText('Missing: storageGb')).toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Storage GB'), '1024');
@@ -474,8 +474,8 @@ Database:
   it('shows estimate summary after successful estimate', async () => {
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Extract Requirements' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Calculate Azure Estimate' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Calculate Azure cost' }));
 
     await waitFor(() => expect(screen.getByText('Step 3: Azure Estimate')).toBeInTheDocument());
     expect(screen.getAllByText('$280.32').length).toBeGreaterThan(0);

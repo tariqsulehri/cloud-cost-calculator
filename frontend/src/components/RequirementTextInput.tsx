@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, Sparkles } from 'lucide-react';
+import { CheckCircle2, FileText, Search, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 interface RequirementTextInputProps {
@@ -29,21 +29,21 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
   return (
     <section className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-card">
       <div className="border-b border-slate-200 bg-slate-50 px-5 py-5">
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-teal/20 bg-white px-2.5 py-1 text-xs font-semibold text-teal shadow-sm">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-azure/20 bg-white px-2.5 py-1 text-xs font-semibold text-azure shadow-sm">
           <FileText className="h-3.5 w-3.5" aria-hidden="true" />
           Step 1
         </div>
-        <h2 className="mt-3 text-lg font-semibold text-navy">Describe Infrastructure</h2>
-        <p className="mt-1 text-sm text-muted">Use natural language. AI-assisted extraction detects Azure requirements before pricing.</p>
+        <h2 className="mt-3 text-lg font-semibold text-navy">Describe cloud needs</h2>
+        <p className="mt-1 text-sm leading-6 text-muted">Paste the requirement. You can improve the text first, or directly find services.</p>
       </div>
       <div className="p-5">
       <label className="block">
-        <span className="text-sm font-semibold text-graphite">Your actual prompt</span>
+        <span className="text-sm font-semibold text-graphite">Requirement text</span>
         <textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          rows={14}
-          className="mt-2 w-full resize-y rounded-lg border border-slate-300 bg-slate-950 px-4 py-3 font-mono text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-teal focus:bg-slate-900 focus:ring-4 focus:ring-teal/15"
+          rows={12}
+          className="mt-2 w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-ink outline-none transition placeholder:text-slate-400 focus:border-azure focus:ring-4 focus:ring-blue-100"
         />
       </label>
       <div className="mt-4 flex flex-wrap gap-3">
@@ -51,49 +51,43 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
           type="button"
           onClick={handleReviewRefine}
           disabled={refining || value.trim().length === 0}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-teal/30 bg-teal/10 px-4 text-sm font-semibold text-teal transition hover:border-teal/50 hover:bg-teal/15 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-graphite transition hover:border-azure/40 hover:bg-blue-50 hover:text-azure disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
         >
           <Sparkles className="h-4 w-4" aria-hidden="true" />
-          {refining ? 'Refining...' : 'Review / refine prompt'}
+          {refining ? 'Improving...' : 'Improve text'}
         </button>
         <button
           type="button"
           onClick={onExtract}
           disabled={loading || value.trim().length === 0}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-navy px-4 text-sm font-semibold text-white shadow-command transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-azure px-4 text-sm font-semibold text-white shadow-glow transition hover:bg-azureDark disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
         >
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          {loading ? 'Extracting...' : 'Extract Requirements'}
+          <Search className="h-4 w-4" aria-hidden="true" />
+          {loading ? 'Finding...' : 'Find services'}
         </button>
       </div>
       {showRefinedPrompt ? (
-        <div className="mt-5 border-t border-slate-200 pt-5">
+        <div className="mt-5 rounded-lg border border-violet/20 bg-violet/5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-violet/20 bg-violet/10 px-2.5 py-1 text-xs font-semibold text-violet">
-              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-              Refined
-            </div>
-            <h3 className="mt-2 text-sm font-semibold text-navy">Refined Azure prompt</h3>
-            <p className="mt-1 text-sm leading-6 text-muted">
-              Complete any open items, then use this prompt for extraction when it matches your intent.
-            </p>
+            <h3 className="text-sm font-semibold text-navy">Improved text is ready</h3>
+            <p className="mt-1 text-sm leading-6 text-muted">Review it quickly. If it looks right, use it and then click Find services.</p>
           </div>
           <button
             type="button"
             onClick={() => onChange(refinedPrompt)}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-violet/30 bg-white px-3 text-xs font-semibold text-violet transition hover:bg-violet/10"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-violet px-3 text-xs font-semibold text-white transition hover:bg-plum"
           >
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            Use completed prompt for extraction
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+            Use improved text
           </button>
         </div>
         <label className="mt-4 block">
-          <span className="text-sm font-semibold text-graphite">Refined prompt</span>
+          <span className="text-sm font-semibold text-graphite">Improved text</span>
           <textarea
             value={refinedPrompt}
             onChange={(event) => setRefinedPrompt(event.target.value)}
-            rows={16}
+            rows={10}
             className="mt-2 w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 font-mono text-sm leading-6 text-ink outline-none transition focus:border-violet focus:ring-4 focus:ring-violet/15"
           />
         </label>
