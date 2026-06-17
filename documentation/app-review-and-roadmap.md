@@ -37,6 +37,8 @@ The app can:
 - Add optional Azure costs such as Managed Disks, NAT Gateway, Firewall, Public IP, Private Endpoint, App Service, SQL Database, Key Vault, Backup, DNS, Front Door, and Container Apps.
 - Calculate early proposal AWS and GCP cost lines using planning rates.
 - Compare Azure, AWS, and GCP totals side by side.
+- Keep a selected base cloud for comparison.
+- Show automatic field mapping from the base cloud to the other clouds.
 - Show unpriced services separately.
 - Keep unsupported items visible instead of adding fake cost.
 
@@ -158,6 +160,15 @@ It should compare:
 
 The combined view should not hide weak coverage. A provider total should be marked partial if some services are missing.
 
+Current combined view behavior:
+
+- The user can choose Azure, AWS, or GCP as the base cloud.
+- The app maps base-cloud answers into a common pricing model.
+- The app maps the common model to Azure, AWS, and GCP fields.
+- The app shows a mapping review table before calculation.
+- The app does not ask the same question three times.
+- The app marks important provider-specific choices as Review when the cost can change.
+
 ## 5. Multi-Cloud UI Plan
 
 The UI should use four top tabs:
@@ -225,7 +236,36 @@ Each provider should have its own pricing adapter. The normalized requirement sh
 
 The Service Mapping tab should be used before building AWS and GCP pricing. It helps the team confirm that one requirement maps to the correct provider service names.
 
-## 6.1 Implementation Plan
+## 6.1 Pricing Question Catalog
+
+The app now has a frontend pricing question catalog.
+
+The catalog defines common cost questions for each service type. Examples:
+
+- Compute: quantity, vCPU, memory, operating system, monthly hours.
+- Database: engine, vCPU, memory, storage size, storage type, high availability.
+- Cache: engine, memory, tier, high availability.
+- Object storage: stored data, access tier, redundancy.
+- Load balancer: HTTP/S or TCP, traffic target.
+
+The catalog also marks cost impact:
+
+- `high`: can strongly change the estimate.
+- `medium`: can change the estimate, but usually less than core sizing.
+- `low`: useful context, but not always a major cost driver.
+
+Provider mapping examples:
+
+| Common value | Azure | AWS | GCP |
+| --- | --- | --- | --- |
+| SSD database storage | Premium/Standard SSD | gp3 SSD | SSD persistent disk |
+| High availability | Zone redundant / HA | Multi-AZ | Regional availability |
+| HTTP/S load balancer | Application Gateway / Front Door | Application Load Balancer | External HTTP(S) Load Balancer |
+| Hot object storage | Hot tier | S3 Standard | Standard storage |
+
+This catalog is the first step toward asking only the right questions for each cloud.
+
+## 6.2 Implementation Plan
 
 Recommended build order:
 
@@ -262,6 +302,11 @@ Recommended build order:
    - Show services not included per provider.
    - Mark totals as partial when needed.
 
+7. Extend the pricing question catalog.
+   - Move common/provider-specific question definitions to backend or database when stable.
+   - Add dropdown options for more provider-specific fields.
+   - Use provider pricing APIs to enrich allowed SKU values where possible.
+
 ## 7. Recommended User Flow
 
 The process should stay simple.
@@ -288,8 +333,10 @@ The process should stay simple.
    - App shows missing or excluded services.
 
 4. Compare
-   - Future step.
    - User switches between Azure, AWS, GCP, and Compare tabs.
+   - The last selected Azure/AWS/GCP tab becomes the base cloud.
+   - The app maps base-cloud answers to the other clouds.
+   - User reviews only important mapped fields or missing values.
 
 ## 8. Badge Meanings
 

@@ -1,5 +1,6 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts';
 import { Coins } from 'lucide-react';
+import { coverageBadgeClass } from '../lib/coverageBadge';
 import { formatCurrency, pricingSourceClass, pricingSourceDescription, pricingSourceLabel } from '../lib/format';
 import { InfoBadge } from './InfoBadge';
 import type { NaturalLanguageEstimateResponse } from '../types/estimate';
@@ -39,7 +40,7 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
             <InfoBadge
               label={`${qualityLabel(quality.status)} · ${quality.coveragePercent}% priced`}
               tooltip={qualityDescription(quality.status)}
-              className={qualityBadgeClass(quality.status)}
+              className={coverageBadgeClass(quality.coveragePercent)}
             />
           ) : null}
         </div>
@@ -172,16 +173,6 @@ function estimateScopeNotes(estimate: NaturalLanguageEstimateResponse): string[]
   const scopePatterns = [/excluded/i, /only/i, /defaults/i, /actual pricing may vary/i];
   const notes = estimate.assumptions.filter((assumption) => scopePatterns.some((pattern) => pattern.test(assumption)));
   return [...new Set(notes)].slice(0, 8);
-}
-
-function qualityBadgeClass(status: 'complete' | 'partial' | 'blocked'): string {
-  if (status === 'complete') {
-    return 'border-emerald-200 bg-emerald-50 text-success';
-  }
-  if (status === 'partial') {
-    return 'border-amber-200 bg-amber-50 text-warning';
-  }
-  return 'border-red-200 bg-red-50 text-danger';
 }
 
 function qualityLabel(status: 'complete' | 'partial' | 'blocked'): string {

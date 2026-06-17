@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -221,6 +221,97 @@ const extractedCacheOnlyRequirements: NormalizedInfrastructureRequirement = {
       confidence: 'high',
       missingFields: [],
       assumptions: ['Redis pricing can be estimated from memory size and tier.']
+    }
+  ],
+  clarifyingQuestions: []
+};
+
+const extractedAllReadyRequirements: NormalizedInfrastructureRequirement = {
+  ...extractedRequirements,
+  components: [
+    extractedRequirements.components[0],
+    {
+      ...extractedRequirements.components[1],
+      highAvailability: true,
+      missingFields: [],
+      pricingStatus: 'not_implemented'
+    },
+    {
+      id: 'cache-1',
+      type: 'cache',
+      name: 'Redis cache',
+      providerServiceHint: { azure: 'Azure Cache for Redis', aws: 'Amazon ElastiCache for Redis', gcp: 'Memorystore for Redis' },
+      pricingStatus: 'not_implemented',
+      rawText: 'Redis cache with 2 GB memory. Tier: production.',
+      engine: 'redis',
+      memoryGb: 2,
+      tier: 'production',
+      confidence: 'medium',
+      missingFields: [],
+      assumptions: ['Redis pricing can be estimated from memory size and tier.']
+    },
+    {
+      id: 'cdn-1',
+      type: 'cdn',
+      name: 'CDN',
+      providerServiceHint: { azure: 'Azure CDN', aws: 'Amazon CloudFront', gcp: 'Cloud CDN' },
+      pricingStatus: 'not_implemented',
+      rawText: 'CDN for static assets with 1 TB transfer per month.',
+      usage: 'static assets',
+      purpose: 'static assets',
+      dataTransferGb: 1024,
+      monthlyTransferGb: 1024,
+      requestCount: null,
+      confidence: 'medium',
+      missingFields: [],
+      assumptions: ['Azure CDN Standard Microsoft pricing can be estimated from monthly transfer and request count.']
+    },
+    {
+      id: 'load-balancer-1',
+      type: 'load_balancer',
+      name: 'Load balancer',
+      providerServiceHint: { azure: 'Azure Application Gateway', aws: 'Elastic Load Balancing', gcp: 'Cloud Load Balancing' },
+      pricingStatus: 'not_implemented',
+      rawText: 'HTTP/S load balancer or ingress.',
+      target: null,
+      scheme: 'http_s',
+      confidence: 'high',
+      missingFields: [],
+      assumptions: ['HTTP/S load balancer pricing maps to Azure Application Gateway Standard v2 baseline pricing.']
+    }
+  ],
+  clarifyingQuestions: []
+};
+
+const extractedCacheMissingTier: NormalizedInfrastructureRequirement = {
+  ...extractedCacheOnlyRequirements,
+  components: extractedCacheOnlyRequirements.components.map((component) => ({
+    ...component,
+    tier: null,
+    missingFields: ['tier'],
+    pricingStatus: 'missing_required_fields'
+  })),
+  clarifyingQuestions: []
+};
+
+const extractedCdnMissingTransfer: NormalizedInfrastructureRequirement = {
+  ...extractedRequirements,
+  components: [
+    {
+      id: 'cdn-1',
+      type: 'cdn',
+      name: 'CDN',
+      providerServiceHint: { azure: 'Azure CDN', aws: 'Amazon CloudFront', gcp: 'Cloud CDN' },
+      pricingStatus: 'missing_required_fields',
+      rawText: 'CDN for static assets.',
+      usage: 'static assets',
+      purpose: 'static assets',
+      dataTransferGb: null,
+      monthlyTransferGb: null,
+      requestCount: null,
+      confidence: 'medium',
+      missingFields: ['monthlyTransferGb'],
+      assumptions: ['Azure CDN Standard Microsoft pricing can be estimated from monthly transfer and request count.']
     }
   ],
   clarifyingQuestions: []
@@ -551,6 +642,20 @@ They run 730 hours per month.`
     expect(screen.getByText('database')).toBeInTheDocument();
   });
 
+  it('shows adapter-priced non-VM services as ready before calculation', async () => {
+    vi.mocked(extractRequirements).mockResolvedValueOnce(extractedAllReadyRequirements);
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+
+    for (const serviceName of ['Virtual machines', 'PostgreSQL database', 'Redis cache', 'CDN', 'Load balancer']) {
+      const card = (await screen.findByText(serviceName)).closest('article');
+      expect(card).not.toBeNull();
+      expect(within(card as HTMLElement).getByText('Ready')).toBeInTheDocument();
+      expect(within(card as HTMLElement).queryByText('Price not ready')).not.toBeInTheDocument();
+    }
+  });
+
   it('clears stale extracted requirements when the prompt changes', async () => {
     render(<App />);
 
@@ -609,6 +714,8 @@ They run 730 hours per month.`
 
     await userEvent.click(screen.getByRole('button', { name: /Compare/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    expect(await screen.findByText('Automatic cloud mapping')).toBeInTheDocument();
+    expect(screen.getAllByText(/Base cloud: Azure/).length).toBeGreaterThan(0);
     await userEvent.click(await screen.findByRole('button', { name: 'Calculate all providers' }));
 
     await waitFor(() => expect(screen.getByText('Cloud cost comparison')).toBeInTheDocument());
@@ -624,6 +731,47 @@ They run 730 hours per month.`
     await userEvent.click(screen.getByLabelText('Show similar cost idea'));
     expect(screen.getByText('Similar cost / remarks')).toBeInTheDocument();
     expect(screen.getAllByText('Remark: guide only, not included in total.').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByLabelText('Also show in cost table'));
+    expect(screen.getAllByText('Guide only (not in total)').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Planning total incl. guidance').length).toBeGreaterThan(0);
+    expect(screen.getByText('$430.32 - $1,480.32')).toBeInTheDocument();
+    expect(screen.getAllByText('$280.32').length).toBeGreaterThan(0);
+
+    expect(screen.getByRole('button', { name: 'View landscape' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Export Excel' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Export PDF' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'View landscape' }));
+    const dialog = screen.getByRole('dialog', { name: 'Landscape cost table' });
+    expect(within(dialog).getByText('Detailed service costs')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Guide only (not in total)').length).toBeGreaterThan(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog', { name: 'Landscape cost table' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the selected provider as base cloud when comparing', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /AWS/ }));
+    expect(screen.getByText(/Base cloud: AWS/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Compare/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+
+    expect(await screen.findByText('Automatic cloud mapping')).toBeInTheDocument();
+    expect(screen.getAllByText(/Base cloud: AWS/).length).toBeGreaterThan(0);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Calculate all providers' }));
+
+    await waitFor(() =>
+      expect(createNaturalLanguageEstimate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'azure',
+          requirements: expect.objectContaining({
+            globalAssumptions: expect.arrayContaining([expect.stringContaining('Base cloud: AWS')])
+          })
+        })
+      )
+    );
   });
 
   it('adds selected optional Azure add-ons to the estimate request', async () => {
@@ -699,6 +847,26 @@ They run 730 hours per month.`
     await waitFor(() => expect(screen.getByRole('button', { name: 'Calculate Azure cost' })).toBeEnabled());
   });
 
+  it('fills a proposal default on Tab while keeping the field editable', async () => {
+    vi.mocked(extractRequirements).mockResolvedValueOnce(extractedCacheMissingTier);
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    expect(await screen.findByText('Missing: tier')).toBeInTheDocument();
+
+    const tierInput = screen.getByLabelText('Tier') as HTMLInputElement;
+    tierInput.focus();
+    await userEvent.tab();
+    expect(tierInput.value).toBe('production');
+
+    await userEvent.clear(tierInput);
+    await userEvent.type(tierInput, 'basic');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
+
+    expect(screen.queryByText('Missing: tier')).not.toBeInTheDocument();
+    expect(screen.getByText('basic')).toBeInTheDocument();
+  });
+
   it('adds selected clarification answers to the prompt', async () => {
     render(<App />);
 
@@ -740,6 +908,19 @@ They run 730 hours per month.`
     await userEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
 
     expect(screen.queryByText('Missing: storageType')).not.toBeInTheDocument();
+  });
+
+  it('lets users fill missing CDN monthly transfer inline', async () => {
+    vi.mocked(extractRequirements).mockResolvedValueOnce(extractedCdnMissingTransfer);
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    expect(await screen.findByText('Missing: monthlyTransferGb')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Monthly transfer GB'), '1024');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
+
+    expect(screen.queryByText('Missing: monthlyTransferGb')).not.toBeInTheDocument();
   });
 
   it('shows estimate summary after successful estimate', async () => {

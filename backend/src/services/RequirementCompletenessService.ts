@@ -54,10 +54,7 @@ export class RequirementCompletenessService {
     }
 
     if (component.type === 'load_balancer') {
-      return [
-        this.isMissing(component.target) && this.isMissing(component.targets) ? 'target' : null,
-        this.isMissing(component.scheme) ? 'scheme' : null
-      ].filter((field): field is string => Boolean(field));
+      return [this.isMissing(component.scheme) ? 'scheme' : null].filter((field): field is string => Boolean(field));
     }
 
     if (component.type === 'kubernetes') {

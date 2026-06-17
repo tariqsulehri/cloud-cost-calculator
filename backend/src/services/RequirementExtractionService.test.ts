@@ -190,7 +190,8 @@ Redis tier: production.`);
     );
 
     expect(cdn.dataTransferGb).toBe(1024);
-    expect(cdn.missingFields).toEqual(['tier']);
+    expect(cdn.monthlyTransferGb).toBe(1024);
+    expect(cdn.missingFields).toEqual([]);
   });
 
   it('ignores pasted result sections when extracting a prompt', () => {

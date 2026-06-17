@@ -1,6 +1,7 @@
 import { CheckCircle2, Clock3, Globe2, TriangleAlert } from 'lucide-react';
 import { ComponentRequirementCard } from './ComponentRequirementCard';
 import { InfoBadge } from './InfoBadge';
+import { reviewStatusForComponent } from '../lib/pricingReadiness';
 import { cn } from '../lib/utils';
 import type { NormalizedInfrastructureRequirement, Provider } from '../types/estimate';
 
@@ -14,16 +15,9 @@ export function RequirementReview({ requirements, provider, onComponentUpdate }:
   const extractionLabel = requirements.extractionMethod === 'llm' ? 'AI-assisted' : 'Rule-based fallback';
   const providerContext = providerReviewContext(provider, requirements);
   const reviewableComponents = requirements.components.filter((component) => !component.optionalAddon);
-  const reviewComponents = reviewableComponents.filter(
-    (component) =>
-      component.missingFields.length > 0 || ['missing_required_fields', 'unsupported', 'needs_review'].includes(component.pricingStatus)
-  );
-  const supportedComponents = reviewableComponents.filter(
-    (component) => component.pricingStatus === 'supported' && component.missingFields.length === 0
-  );
-  const notImplementedComponents = reviewableComponents.filter(
-    (component) => component.pricingStatus === 'not_implemented' && component.missingFields.length === 0
-  );
+  const reviewComponents = reviewableComponents.filter((component) => ['needsReview', 'unsupported'].includes(reviewStatusForComponent(component, provider)));
+  const supportedComponents = reviewableComponents.filter((component) => reviewStatusForComponent(component, provider) === 'supported');
+  const notImplementedComponents = reviewableComponents.filter((component) => reviewStatusForComponent(component, provider) === 'notImplemented');
 
   return (
     <section className="overflow-hidden rounded-xl border border-line bg-panel shadow-card">

@@ -48,6 +48,22 @@ describe('CloudCatalogDatabase', () => {
     expect(redisCache?.requiredFields).toEqual(['engine', 'memoryGb', 'tier']);
   });
 
+  it('does not require load balancer target for pricing readiness', () => {
+    const catalog = createCatalog();
+    const services = catalog.listServices({ provider: 'azure', query: 'Application Gateway' });
+    const applicationGateway = services.find((service) => service.serviceKey === 'load_balancer.http_s');
+
+    expect(applicationGateway?.requiredFields).toEqual(['scheme']);
+  });
+
+  it('uses monthly transfer as the CDN pricing readiness field', () => {
+    const catalog = createCatalog();
+    const services = catalog.listServices({ provider: 'azure', query: 'Azure CDN' });
+    const cdn = services.find((service) => service.serviceKey === 'cdn');
+
+    expect(cdn?.requiredFields).toEqual(['monthlyTransferGb']);
+  });
+
   it('imports the full spreadsheet service catalog for each provider', () => {
     const catalog = createCatalog();
 

@@ -317,9 +317,10 @@ export class RequirementExtractionService {
       rawText: cdnSegment,
       purpose: text.includes('static assets') ? 'static assets' : null,
       dataTransferGb: transferGb,
+      monthlyTransferGb: transferGb,
       requestCount,
       confidence: transferGb ? 'high' : 'medium',
-      missingFields: [transferGb ? undefined : 'dataTransferGb', 'tier'].filter((field): field is string => Boolean(field)),
+      missingFields: [transferGb ? undefined : 'monthlyTransferGb'].filter((field): field is string => Boolean(field)),
       assumptions: ['Azure CDN Standard Microsoft pricing can be estimated from monthly transfer and request count.', '1 TB is normalized to 1024 GB.']
     };
   }

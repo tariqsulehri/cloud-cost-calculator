@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock3, WandSparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { confidenceClass, confidenceDescription, confidenceLabel } from '../lib/format';
+import { reviewStatusForComponent, type ReviewStatus } from '../lib/pricingReadiness';
 import { InfoBadge } from './InfoBadge';
 import type { NormalizedComponent, Provider } from '../types/estimate';
 
@@ -30,7 +31,8 @@ interface ReviewField {
 
 export function ComponentRequirementCard({ component, provider, onUpdate }: ComponentRequirementCardProps) {
   const [expanded, setExpanded] = useState(component.missingFields.length > 0);
-  const Icon = statusIcon(component);
+  const status = reviewStatusForComponent(component, provider);
+  const Icon = statusIcon(status);
 
   return (
     <article className="overflow-visible rounded-xl border border-line bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-teal/30 hover:shadow-cardHover">
@@ -41,7 +43,7 @@ export function ComponentRequirementCard({ component, provider, onUpdate }: Comp
         className="flex w-full items-start justify-between gap-3 px-3.5 py-3.5 text-left"
       >
         <div className="flex min-w-0 gap-2.5">
-          <span className={`mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-lg border ${statusIconClass(component)}`}>
+          <span className={`mt-0.5 flex h-9 w-9 flex-none items-center justify-center rounded-lg border ${statusIconClass(status)}`}>
             <Icon className="h-4 w-4" aria-hidden="true" />
           </span>
           <div className="min-w-0">
@@ -53,7 +55,7 @@ export function ComponentRequirementCard({ component, provider, onUpdate }: Comp
           </div>
         </div>
         <div className="flex flex-none items-center gap-2">
-          <InfoBadge label={statusLabel(component)} tooltip={statusDescription(component)} className={statusClass(component)} />
+          <InfoBadge label={statusLabel(status)} tooltip={statusDescription(status)} className={statusClass(status)} />
           <InfoBadge label={confidenceLabel(component.confidence)} tooltip={confidenceDescription(component.confidence)} className={confidenceClass(component.confidence)} />
           {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5 text-muted" aria-hidden="true" />}
         </div>
@@ -113,6 +115,14 @@ function ReviewEditor({
     setValues((current) => ({ ...current, [key]: value }));
   }
 
+  function handleSuggestionTab(field: ReviewField, event: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
+    if (event.key !== 'Tab' || event.shiftKey || !field.defaultValue || values[field.key]?.trim()) {
+      return;
+    }
+
+    setField(field.key, field.defaultValue);
+  }
+
   function handleApply() {
     const updates = parseUpdates(editableFields, values);
 
@@ -170,6 +180,7 @@ function ReviewEditor({
                   aria-label={field.label}
                   value={values[field.key] ?? ''}
                   onChange={(event) => setField(field.key, event.target.value)}
+                  onKeyDown={(event) => handleSuggestionTab(field, event)}
                   className="mt-1 h-8 w-full rounded-md border border-line bg-white px-2 text-xs text-ink outline-none transition focus:border-teal focus:ring-4 focus:ring-teal/10"
                 >
                   <option value="">Select</option>
@@ -186,7 +197,7 @@ function ReviewEditor({
                     ))
                   )}
                 </select>
-                {field.hint ? <span className="mt-1 block text-[11px] leading-4 text-muted">{field.hint}</span> : null}
+                {field.hint ? <FieldHint field={field} /> : null}
               </>
             ) : (
               <>
@@ -196,16 +207,26 @@ function ReviewEditor({
                   min={field.kind === 'number' ? 0 : undefined}
                   value={values[field.key] ?? ''}
                   onChange={(event) => setField(field.key, event.target.value)}
+                  onKeyDown={(event) => handleSuggestionTab(field, event)}
                   placeholder={field.placeholder}
                   className="mt-1 h-8 w-full rounded-md border border-line bg-white px-2 text-xs text-ink outline-none transition placeholder:text-slate-400 focus:border-teal focus:ring-4 focus:ring-teal/10"
                 />
-                {field.hint ? <span className="mt-1 block text-[11px] leading-4 text-muted">{field.hint}</span> : null}
+                {field.hint ? <FieldHint field={field} /> : null}
               </>
             )}
           </label>
         ))}
       </div>
     </div>
+  );
+}
+
+function FieldHint({ field }: { field: ReviewField }) {
+  return (
+    <span className="mt-1 block text-[11px] leading-4 text-muted">
+      {field.hint}
+      {field.defaultValue ? ' Press Tab to use the suggestion.' : null}
+    </span>
   );
 }
 
@@ -266,6 +287,13 @@ function reviewEditableFields(component: NormalizedComponent, provider: Provider
     scheme: { label: 'Scheme', kind: 'text', placeholder: 'http_s', defaultValue: suggestion.scheme, hint: 'HTTP/S is used for web apps and ingress. TCP is used for network load balancing.' },
     target: { label: 'Target', kind: 'text', placeholder: component.type === 'load_balancer' ? 'API Gateway service' : undefined },
     dataTransferGb: { label: 'Data transfer GB', kind: 'number', placeholder: '3072' },
+    monthlyTransferGb: {
+      label: 'Monthly transfer GB',
+      kind: 'number',
+      placeholder: '1024',
+      defaultValue: suggestion.monthlyTransferGb,
+      hint: 'Proposal default: 1024 GB (1 TB). Change it when the customer gives expected CDN traffic.'
+    },
     dataStoredGb: { label: 'Data stored GB', kind: 'number', placeholder: '5120' },
     accessTier: { label: 'Access tier', kind: 'text', placeholder: 'hot', defaultValue: suggestion.accessTier, hint: 'Hot is common for frequently used files. Cool/archive is cheaper for rarely used data.' },
     redundancy: { label: 'Redundancy', kind: 'text', placeholder: 'LRS', defaultValue: suggestion.redundancy, hint: 'LRS is the lowest-cost baseline. Use ZRS/GRS when resilience is required.' },
@@ -410,6 +438,12 @@ function suggestedDefaults(component: NormalizedComponent): Record<string, strin
   if (component.type === 'load_balancer') {
     return {
       scheme: /\b(tcp|udp|network)\b/.test(context) ? 'tcp' : 'http_s'
+    };
+  }
+
+  if (component.type === 'cdn') {
+    return {
+      monthlyTransferGb: '1024'
     };
   }
 
@@ -618,9 +652,8 @@ function DetailsGrid({
   );
 }
 
-function statusLabel(component: NormalizedComponent): string {
-  const status = statusKind(component);
-  const labels: Record<ReturnType<typeof statusKind>, string> = {
+function statusLabel(status: ReviewStatus): string {
+  const labels: Record<ReviewStatus, string> = {
     supported: 'Ready',
     notImplemented: 'Price not ready',
     needsReview: 'Need info',
@@ -629,9 +662,8 @@ function statusLabel(component: NormalizedComponent): string {
   return labels[status];
 }
 
-function statusDescription(component: NormalizedComponent): string {
-  const status = statusKind(component);
-  const descriptions: Record<ReturnType<typeof statusKind>, string> = {
+function statusDescription(status: ReviewStatus): string {
+  const descriptions: Record<ReviewStatus, string> = {
     supported: 'All needed details are present. This service can be priced.',
     notImplemented: 'The app detected this service, but pricing for it is not built yet.',
     needsReview: 'Some required details are missing. Add them before estimating.',
@@ -640,21 +672,7 @@ function statusDescription(component: NormalizedComponent): string {
   return descriptions[status];
 }
 
-function statusKind(component: NormalizedComponent): 'supported' | 'notImplemented' | 'needsReview' | 'unsupported' {
-  if (component.missingFields.length > 0 || component.pricingStatus === 'missing_required_fields' || component.pricingStatus === 'needs_review') {
-    return 'needsReview';
-  }
-  if (component.pricingStatus === 'not_implemented') {
-    return 'notImplemented';
-  }
-  if (component.pricingStatus === 'supported') {
-    return 'supported';
-  }
-  return 'unsupported';
-}
-
-function statusClass(component: NormalizedComponent): string {
-  const status = statusKind(component);
+function statusClass(status: ReviewStatus): string {
   if (status === 'supported') {
     return 'border-emerald-200 bg-emerald-50 text-success';
   }
@@ -667,8 +685,7 @@ function statusClass(component: NormalizedComponent): string {
   return 'border-red-200 bg-red-50 text-danger';
 }
 
-function statusIcon(component: NormalizedComponent) {
-  const status = statusKind(component);
+function statusIcon(status: ReviewStatus) {
   if (status === 'supported') {
     return CircleCheck;
   }
@@ -678,8 +695,7 @@ function statusIcon(component: NormalizedComponent) {
   return CircleAlert;
 }
 
-function statusIconClass(component: NormalizedComponent): string {
-  const status = statusKind(component);
+function statusIconClass(status: ReviewStatus): string {
   if (status === 'supported') {
     return 'border-emerald-200 bg-emerald-50 text-success';
   }

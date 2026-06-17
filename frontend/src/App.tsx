@@ -4,6 +4,7 @@ import { AiHelpTab } from './components/AiHelpTab';
 import { CalculateEstimateButton } from './components/CalculateEstimateButton';
 import { ClarifyingQuestionsPanel } from './components/ClarifyingQuestionsPanel';
 import { CompareEstimates } from './components/CompareEstimates';
+import { CrossCloudMappingPanel } from './components/CrossCloudMappingPanel';
 import { ErrorAlert } from './components/ErrorAlert';
 import { EstimateSummary } from './components/EstimateSummary';
 import { LoadingState } from './components/LoadingState';
@@ -16,6 +17,8 @@ import { AssumptionsPanel } from './components/AssumptionsPanel';
 import { ServiceMappingTab } from './components/ServiceMappingTab';
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs';
 import { createNaturalLanguageEstimate, extractRequirements, getApiErrorMessage, refineRequirements } from './lib/api';
+import { withCrossCloudMappingAssumption } from './lib/crossCloudMapping';
+import { isEstimableComponent } from './lib/pricingReadiness';
 import type { NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement, Provider } from './types/estimate';
 
 const exampleRequirement = `I need 2 web servers with 4 vCPU and 16GB RAM each, running Linux Ubuntu.
@@ -62,14 +65,22 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('estimate');
   const [selectedProvider, setSelectedProvider] = useState<ProviderTabKey>('azure');
+  const [baseProvider, setBaseProvider] = useState<Provider>('azure');
   const requirementTextRef = useRef(exampleRequirement);
   const extractRequestRef = useRef(0);
 
   const hasCurrentExtraction = Boolean(requirements && extractedPrompt === requirementText);
-  const hasEstimablePricing = Boolean(hasCurrentExtraction && requirements?.components.some(isEstimableComponent));
-  const activeProvider = selectedProvider === 'compare' ? 'azure' : selectedProvider;
+  const hasEstimablePricing = Boolean(hasCurrentExtraction && requirements?.components.some((component) => isEstimableComponent(component, selectedProvider)));
+  const activeProvider = selectedProvider === 'compare' ? baseProvider : selectedProvider;
   const activeEstimate = selectedProvider === 'compare' ? null : estimates[activeProvider];
   const hasAnyEstimate = Object.values(estimates).some(Boolean);
+
+  function handleProviderSelect(provider: ProviderTabKey) {
+    setSelectedProvider(provider);
+    if (provider !== 'compare') {
+      setBaseProvider(provider);
+    }
+  }
 
   function handleRequirementTextChange(value: string) {
     requirementTextRef.current = value;
@@ -123,7 +134,7 @@ function App() {
           (['azure', 'aws', 'gcp'] as Provider[]).map((provider) =>
             createNaturalLanguageEstimate({
               provider,
-              requirements
+              requirements: withCrossCloudMappingAssumption(requirements, baseProvider, provider)
             })
           )
         );
@@ -134,7 +145,7 @@ function App() {
       } else {
         const result = await createNaturalLanguageEstimate({
           provider: selectedProvider,
-          requirements
+          requirements: withCrossCloudMappingAssumption(requirements, activeProvider, selectedProvider)
         });
         setEstimates((current) => ({ ...current, [selectedProvider]: result }));
       }
@@ -242,7 +253,7 @@ function App() {
         </header>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
-          <ProviderTabs selected={selectedProvider} estimates={estimates} onSelect={setSelectedProvider} />
+          <ProviderTabs selected={selectedProvider} baseProvider={baseProvider} estimates={estimates} onSelect={handleProviderSelect} />
           <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={hasAnyEstimate} />
         </div>
 
@@ -287,6 +298,7 @@ function App() {
                       onRemove={handleOptionalAddOnRemove}
                     />
                   ) : null}
+                  {selectedProvider === 'compare' ? <CrossCloudMappingPanel requirements={requirements} baseProvider={baseProvider} /> : null}
                   <ClarifyingQuestionsPanel questions={requirements.clarifyingQuestions} onAnswer={handleClarificationAnswer} />
                   <AssumptionsPanel assumptions={requirements.globalAssumptions} />
                   <div className="flex justify-end">
@@ -335,63 +347,6 @@ export default App;
 
 function hasReviewValue(value: unknown): boolean {
   return value !== null && value !== undefined && value !== '';
-}
-
-function isEstimableComponent(component: NormalizedInfrastructureRequirement['components'][number]): boolean {
-  if (component.pricingStatus === 'missing_required_fields' || component.pricingStatus === 'unsupported' || component.pricingStatus === 'needs_review') {
-    return false;
-  }
-
-  if (component.optionalAddon && component.missingFields.length === 0) {
-    return true;
-  }
-
-  if (component.type === 'compute') {
-    return component.pricingStatus === 'supported';
-  }
-
-  if (component.type === 'kubernetes') {
-    return typeof component.nodeCount === 'number' && typeof component.vcpuPerNode === 'number' && typeof component.memoryGbPerNode === 'number';
-  }
-
-  if (component.type === 'database') {
-    return (
-      component.engine === 'postgresql' &&
-      typeof component.vcpu === 'number' &&
-      typeof component.storageGb === 'number' &&
-      typeof component.highAvailability === 'boolean'
-    );
-  }
-
-  if (component.type === 'cache') {
-    return component.engine === 'redis' && typeof component.memoryGb === 'number' && typeof component.tier === 'string';
-  }
-
-  if (component.type === 'object_storage') {
-    return typeof component.dataStoredGb === 'number' && typeof component.accessTier === 'string' && typeof component.redundancy === 'string';
-  }
-
-  if (component.type === 'cdn') {
-    return typeof component.dataTransferGb === 'number' || typeof component.monthlyTransferGb === 'number' || typeof component.requestCount === 'number';
-  }
-
-  if (component.type === 'load_balancer') {
-    return component.scheme === 'http_s';
-  }
-
-  if (component.type === 'queue') {
-    return typeof component.tier === 'string' && typeof component.messageVolume === 'number';
-  }
-
-  if (component.type === 'monitoring') {
-    return typeof component.logIngestionGb === 'number';
-  }
-
-  if (component.type === 'network') {
-    return typeof component.monthlyEgressGb === 'number';
-  }
-
-  return false;
 }
 
 function applyClarification(
