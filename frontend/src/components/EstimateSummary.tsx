@@ -12,11 +12,11 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
   const scopeNotes = estimateScopeNotes(estimate);
 
   return (
-    <section className="rounded-lg border border-line bg-panel p-5 shadow-card">
+    <section className="rounded-md border border-line bg-panel p-4 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-navy">Step 3: Azure Estimate</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <h2 className="text-base font-semibold text-navy">Step 3: Azure Estimate</h2>
+          <p className="mt-0.5 text-xs text-slate-600">
             {quality?.summary ?? 'Only supported Azure VM compute pricing is included.'}
           </p>
         </div>
@@ -28,21 +28,21 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
           />
         ) : null}
       </div>
-      <div className="mt-3 text-4xl font-bold text-teal">{formatCurrency(estimate.totalMonthlyCost, estimate.currency)}</div>
+      <div className="mt-2 text-3xl font-bold text-teal">{formatCurrency(estimate.totalMonthlyCost, estimate.currency)}</div>
       {isPartial ? (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
           This is not a full platform estimate. The total includes only calculated line items below; excluded services are listed for review.
         </div>
       ) : quality?.status === 'complete' ? (
-        <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
+        <div className="mt-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-950">
           Base estimate is complete for detected services. Some optional Azure meters may still be excluded unless the prompt specifies them.
         </div>
       ) : null}
 
       {scopeNotes.length > 0 ? (
-        <div className="mt-5 rounded-lg border border-line bg-slate-50 p-4">
-          <h3 className="text-sm font-semibold text-navy">Base estimate scope</h3>
-          <ul className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+        <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+          <h3 className="text-xs font-semibold uppercase text-navy">Base estimate scope</h3>
+          <ul className="mt-1.5 space-y-1 text-xs leading-5 text-slate-700">
             {scopeNotes.map((note) => (
               <li key={note}>{note}</li>
             ))}
@@ -50,35 +50,35 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
         </div>
       ) : null}
 
-      <div className="mt-5">
-        <h3 className="text-sm font-semibold text-navy">Calculated line items</h3>
+      <div className="mt-4">
+        <h3 className="text-xs font-semibold uppercase text-navy">Calculated line items</h3>
         {estimate.calculatedLineItems.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">No calculated pricing line items.</p>
+          <p className="mt-1.5 text-xs text-slate-600">No calculated pricing line items.</p>
         ) : (
-          <div className="mt-2 overflow-hidden rounded-lg border border-line">
+          <div className="mt-2 overflow-hidden rounded-md border border-line">
             <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-line text-sm">
-              <thead className="bg-navy text-left text-xs font-semibold uppercase text-slate-200">
+            <table className="min-w-full divide-y divide-line text-xs">
+              <thead className="bg-navy text-left text-[11px] font-semibold uppercase text-slate-200">
                 <tr>
-                  <th className="px-4 py-3">Service</th>
-                  <th className="px-4 py-3">SKU</th>
-                  <th className="px-4 py-3">Qty x Hours</th>
-                  <th className="px-4 py-3">Unit price</th>
-                  <th className="px-4 py-3">Monthly</th>
-                  <th className="px-4 py-3">Source</th>
+                  <th className="px-3 py-2">Service</th>
+                  <th className="px-3 py-2">SKU</th>
+                  <th className="px-3 py-2">Qty x Hours</th>
+                  <th className="px-3 py-2">Unit price</th>
+                  <th className="px-3 py-2">Monthly</th>
+                  <th className="px-3 py-2">Source</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {estimate.calculatedLineItems.map((item) => (
                   <tr key={`${item.serviceName}-${item.skuName}-${item.meterName}`}>
-                    <td className="px-4 py-3">{item.serviceName}</td>
-                    <td className="px-4 py-3">{item.skuName}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">{item.serviceName}</td>
+                    <td className="px-3 py-2">{item.skuName}</td>
+                    <td className="px-3 py-2">
                       {item.usageLabel ?? `${item.quantity} x ${item.hours}`}
                     </td>
-                    <td className="px-4 py-3">{formatCurrency(item.unitPrice, estimate.currency)}</td>
-                    <td className="px-4 py-3 font-semibold">{formatCurrency(item.monthlyCost, estimate.currency)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">{formatCurrency(item.unitPrice, estimate.currency)}</td>
+                    <td className="px-3 py-2 font-semibold">{formatCurrency(item.monthlyCost, estimate.currency)}</td>
+                    <td className="px-3 py-2">
                       <InfoBadge
                         label={pricingSourceLabel(item.pricingSource)}
                         tooltip={pricingSourceDescription(item.pricingSource)}
@@ -95,22 +95,22 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
         )}
       </div>
 
-      <div className="mt-5">
-        <h3 className="text-sm font-semibold text-navy">Detected, price not ready</h3>
+      <div className="mt-4">
+        <h3 className="text-xs font-semibold uppercase text-navy">Detected, price not ready</h3>
         <UnpricedItems items={estimate.notImplementedLineItems} emptyText="No services waiting for pricing support." />
       </div>
 
-      <div className="mt-5">
-        <h3 className="text-sm font-semibold text-navy">Missing required fields</h3>
+      <div className="mt-4">
+        <h3 className="text-xs font-semibold uppercase text-navy">Missing required fields</h3>
         <UnpricedItems items={estimate.missingRequiredFieldLineItems} emptyText="No services are missing required pricing fields." />
       </div>
 
-      <div className="mt-5">
-        <h3 className="text-sm font-semibold text-navy">Need review or cannot price</h3>
+      <div className="mt-4">
+        <h3 className="text-xs font-semibold uppercase text-navy">Need review or cannot price</h3>
         <UnpricedItems items={estimate.unsupportedLineItems} emptyText="No services need review here." />
       </div>
 
-      <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+      <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
         Estimate uses Azure public retail pricing where implemented. Actual pricing may vary based on enterprise agreements,
         reservations, savings plans, taxes, region, and Azure calculator rounding.
       </p>
@@ -162,16 +162,16 @@ function UnpricedItems({
   emptyText: string;
 }) {
   if (items.length === 0) {
-    return <p className="mt-2 text-sm text-slate-600">{emptyText}</p>;
+    return <p className="mt-1.5 text-xs text-slate-600">{emptyText}</p>;
   }
 
   return (
     <div className="mt-2 grid gap-2">
       {items.map((item) => (
-        <div key={item.componentId} className="rounded-lg border border-line bg-slate-50 p-3 text-sm">
+        <div key={item.componentId} className="rounded-md border border-line bg-slate-50 p-2.5 text-xs">
           <div className="font-semibold text-slate-900">{item.serviceName}</div>
-          <div className="mt-1 text-slate-600">{item.reason}</div>
-          {item.rawText ? <div className="mt-2 rounded-md border border-line bg-white px-3 py-2 text-xs text-slate-600">{item.rawText}</div> : null}
+          <div className="mt-0.5 text-slate-600">{item.reason}</div>
+          {item.rawText ? <div className="mt-1.5 rounded-md border border-line bg-white px-2.5 py-1.5 text-[11px] text-slate-600">{item.rawText}</div> : null}
         </div>
       ))}
     </div>

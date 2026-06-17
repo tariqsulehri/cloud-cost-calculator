@@ -13,7 +13,7 @@ const steps = [
 
 export function ProcessRail({ hasRequirements, hasEstimate }: ProcessRailProps) {
   return (
-    <section className="grid gap-3 rounded-lg border border-line bg-white p-3 shadow-card md:grid-cols-3">
+    <section className="grid gap-2 rounded-md border border-line bg-white p-2 shadow-card sm:grid-cols-3 xl:grid-cols-1">
       {steps.map((step, index) => {
         const Icon = step.icon;
         const isDone = step.key === 'describe' ? hasRequirements : step.key === 'review' ? hasEstimate : false;
@@ -21,7 +21,7 @@ export function ProcessRail({ hasRequirements, hasEstimate }: ProcessRailProps) 
         return (
           <div
             key={step.key}
-            className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${
+            className={`flex items-center gap-2 rounded-md border px-3 py-2 ${
               isActive
                 ? 'border-azure bg-blue-50 text-azure'
                 : isDone
@@ -29,13 +29,13 @@ export function ProcessRail({ hasRequirements, hasEstimate }: ProcessRailProps) 
                   : 'border-slate-200 bg-slate-50 text-slate-600'
             }`}
           >
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-white shadow-sm">
-              <Icon className="h-4 w-4" aria-hidden="true" />
+            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-md bg-white shadow-sm">
+              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
             </span>
             <div>
-              <div className="text-xs font-bold uppercase tracking-wide">Step {index + 1}</div>
-              <div className="text-sm font-bold text-navy">{step.title}</div>
-              <div className="text-xs leading-5 text-slate-600">{step.text}</div>
+              <div className="text-[10px] font-bold uppercase text-slate-500">Step {index + 1}</div>
+              <div className="text-xs font-bold text-navy">{step.title}</div>
+              <div className="text-[11px] leading-4 text-slate-600">{step.text}</div>
             </div>
           </div>
         );

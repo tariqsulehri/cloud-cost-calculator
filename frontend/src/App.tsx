@@ -33,19 +33,19 @@ const workspaceTabs: Array<{
   {
     key: 'estimate',
     label: 'Estimate',
-    helper: 'Review and calculate Azure cost',
+    helper: 'Azure cost',
     icon: Calculator
   },
   {
     key: 'mapping',
     label: 'Service Mapping',
-    helper: 'Find Azure, AWS, and GCP matches',
+    helper: 'Cloud matches',
     icon: GitCompareArrows
   },
   {
     key: 'ai',
     label: 'AI Help',
-    helper: 'Explain status in simple words',
+    helper: 'Plain English',
     icon: Bot
   }
 ];
@@ -164,24 +164,29 @@ function App() {
 
   return (
     <main className="min-h-screen bg-mist text-ink">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="overflow-hidden rounded-lg border border-slate-800 bg-navy px-5 py-5 shadow-command">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 px-3 py-3 sm:px-4 lg:px-5">
+        <header className="overflow-hidden rounded-md border border-slate-800 bg-navy px-4 py-3 shadow-command">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="h-1 w-12 rounded-full bg-tealSoft" />
-              <h1 className="mt-3 text-2xl font-bold text-white">Cloud Cost Calculator</h1>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">
-                Review infrastructure needs, fix missing details, and calculate cloud cost. Azure pricing is active now; AWS, GCP, and combined comparison are planned from the service mapping.
+              <div className="h-0.5 w-10 rounded-full bg-tealSoft" />
+              <h1 className="mt-2 text-xl font-bold text-white">Cloud Cost Calculator</h1>
+              <p className="mt-0.5 max-w-3xl text-xs leading-5 text-slate-300">
+                Compact FinOps workspace for service review, pricing readiness, and multi-cloud mapping.
               </p>
             </div>
-            <span className="rounded-full border border-tealSoft/30 bg-tealSoft/10 px-3 py-1 text-xs font-semibold text-tealSoft">FinOps review workspace</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md border border-tealSoft/30 bg-tealSoft/10 px-2.5 py-1 text-[11px] font-semibold text-tealSoft">Azure pricing active</span>
+              <span className="rounded-md border border-slate-600 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-200">AWS/GCP mapping</span>
+            </div>
           </div>
         </header>
 
-        <ProviderTabs />
-        <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={Boolean(estimate)} />
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_430px]">
+          <ProviderTabs />
+          <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={Boolean(estimate)} />
+        </div>
 
-        <nav className="grid gap-3 rounded-lg border border-line bg-white p-2 shadow-card md:grid-cols-3" aria-label="Workspace tabs">
+        <nav className="grid gap-2 rounded-md border border-line bg-white p-1.5 shadow-card md:grid-cols-3" aria-label="Workspace tabs">
           {workspaceTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = workspaceTab === tab.key;
@@ -190,17 +195,17 @@ function App() {
                 key={tab.key}
                 type="button"
                 onClick={() => setWorkspaceTab(tab.key)}
-                className={`flex min-h-16 items-center gap-3 rounded-md border px-4 py-3 text-left transition ${
+                className={`flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-left transition ${
                   isActive
                     ? 'border-azure bg-blue-50 text-azure shadow-sm'
                     : 'border-transparent bg-white text-graphite hover:border-slate-200 hover:bg-slate-50'
                 }`}
                 aria-current={isActive ? 'page' : undefined}
               >
-                <Icon className="h-5 w-5 flex-none" aria-hidden="true" />
+                <Icon className="h-4 w-4 flex-none" aria-hidden="true" />
                 <span>
-                  <span className="block text-sm font-bold">{tab.label}</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-muted">{tab.helper}</span>
+                  <span className="block text-xs font-bold">{tab.label}</span>
+                  <span className="mt-0.5 block text-[11px] leading-4 text-muted">{tab.helper}</span>
                 </span>
               </button>
             );
@@ -208,7 +213,7 @@ function App() {
         </nav>
 
         {workspaceTab === 'estimate' ? (
-          <div className="grid gap-6 lg:grid-cols-[430px_minmax(0,1fr)]">
+          <div className="grid gap-3 lg:grid-cols-[390px_minmax(0,1fr)]">
             <RequirementTextInput
               value={requirementText}
               loading={loading === 'extract'}
@@ -217,7 +222,7 @@ function App() {
               onRefine={refineRequirements}
             />
 
-            <div className="space-y-5">
+            <div className="space-y-3">
               {error ? <ErrorAlert message={error} /> : null}
               {loading ? <LoadingState /> : null}
               {requirements ? (
@@ -232,9 +237,9 @@ function App() {
                   />
                 </>
               ) : (
-                <section className="rounded-lg border border-dashed border-line bg-panel p-8 text-center shadow-card">
-                  <h2 className="text-lg font-semibold text-navy">Start by finding services</h2>
-                  <p className="mt-2 text-sm leading-6 text-muted">
+                <section className="rounded-md border border-dashed border-line bg-panel p-5 text-center shadow-card">
+                  <h2 className="text-base font-semibold text-navy">Start by finding services</h2>
+                  <p className="mt-1 text-xs leading-5 text-muted">
                     Paste the requirement on the left, then click Find services. The app will show what can be priced and what needs more information.
                   </p>
                 </section>

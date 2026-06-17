@@ -24,25 +24,25 @@ export function ClarifyingQuestionsPanel({ questions, onAnswer }: ClarifyingQues
   }
 
   return (
-    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-card">
+    <section className="rounded-md border border-amber-200 bg-amber-50 p-3 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-amber-950">Clarifying questions</h2>
-          <p className="mt-1 text-sm text-amber-900">Select answers one by one. Each answer is added to your prompt for the next extraction.</p>
+          <h2 className="text-xs font-semibold uppercase text-amber-950">Clarifying questions</h2>
+          <p className="mt-0.5 text-xs text-amber-900">Select answers one by one. Each answer is added to the prompt.</p>
         </div>
-        <span className="rounded-full border border-amber-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-amber-900">{questions.length} open</span>
+        <span className="rounded-md border border-amber-200 bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-amber-900">{questions.length} open</span>
       </div>
-      <ul className="mt-4 space-y-3 text-sm text-amber-900">
+      <ul className="mt-2 space-y-2 text-xs text-amber-900">
         {questions.map((question) => (
-          <li key={question} className="rounded-lg border border-amber-200 bg-white/90 p-3 shadow-sm">
+          <li key={question} className="rounded-md border border-amber-200 bg-white/90 p-2.5 shadow-sm">
             <div className="font-semibold text-amber-950">{question}</div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {(clarificationOptions[question] ?? []).map((option) => (
                 <button
                   key={option.label}
                   type="button"
                   onClick={() => onAnswer(question, option.clarification)}
-                  className="inline-flex h-9 items-center rounded-lg border border-amber-200 bg-white px-3 text-xs font-semibold text-amber-950 transition hover:border-amber-300 hover:bg-amber-100"
+                  className="inline-flex h-8 items-center rounded-md border border-amber-200 bg-white px-2.5 text-[11px] font-semibold text-amber-950 transition hover:border-amber-300 hover:bg-amber-100"
                 >
                   {option.label}
                 </button>

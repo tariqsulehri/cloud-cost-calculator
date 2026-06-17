@@ -4,15 +4,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        azure: '#1D4ED8',
-        azureDark: '#1E40AF',
+        azure: '#2563EB',
+        azureDark: '#1D4ED8',
         teal: '#0D9488',
         tealSoft: '#CCFBF1',
-        navy: '#0B1220',
+        navy: '#111827',
         ink: '#1F2937',
-        mist: '#F3F6FB',
+        mist: '#F6F8FB',
         panel: '#FFFFFF',
-        line: '#CBD5E1',
+        line: '#D7DEE8',
         muted: '#64748B',
         success: '#047857',
         warning: '#C2410C',
@@ -24,10 +24,10 @@ export default {
         gcp: '#166534'
       },
       boxShadow: {
-        soft: '0 18px 42px rgba(15, 23, 42, 0.08)',
-        card: '0 14px 34px rgba(15, 23, 42, 0.10)',
-        command: '0 20px 45px rgba(15, 23, 42, 0.18)',
-        glow: '0 14px 26px rgba(29, 78, 216, 0.20)'
+        soft: '0 10px 24px rgba(15, 23, 42, 0.06)',
+        card: '0 8px 22px rgba(15, 23, 42, 0.07)',
+        command: '0 12px 30px rgba(15, 23, 42, 0.14)',
+        glow: '0 10px 20px rgba(37, 99, 235, 0.16)'
       }
     }
   },

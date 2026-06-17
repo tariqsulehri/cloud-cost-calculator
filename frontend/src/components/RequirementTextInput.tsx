@@ -27,31 +27,31 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-card">
-      <div className="border-b border-slate-200 bg-slate-50 px-5 py-5">
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-azure/20 bg-white px-2.5 py-1 text-xs font-semibold text-azure shadow-sm">
+    <section className="overflow-hidden rounded-md border border-slate-300 bg-white shadow-card">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="dashboard-kicker text-azure">
           <FileText className="h-3.5 w-3.5" aria-hidden="true" />
           Step 1
         </div>
-        <h2 className="mt-3 text-lg font-semibold text-navy">Describe cloud needs</h2>
-        <p className="mt-1 text-sm leading-6 text-muted">Paste the requirement. You can improve the text first, or directly find services.</p>
+        <h2 className="mt-2 text-base font-semibold text-navy">Describe cloud needs</h2>
+        <p className="mt-0.5 text-xs leading-5 text-muted">Paste the requirement, improve it if needed, then find services.</p>
       </div>
-      <div className="p-5">
+      <div className="p-4">
       <label className="block">
-        <span className="text-sm font-semibold text-graphite">Requirement text</span>
+        <span className="text-xs font-semibold uppercase text-graphite">Requirement text</span>
         <textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          rows={12}
-          className="mt-2 w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-ink outline-none transition placeholder:text-slate-400 focus:border-azure focus:ring-4 focus:ring-blue-100"
+          rows={9}
+          className="mt-1.5 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs leading-5 text-ink outline-none transition placeholder:text-slate-400 focus:border-azure focus:ring-4 focus:ring-blue-100"
         />
       </label>
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={handleReviewRefine}
           disabled={refining || value.trim().length === 0}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-graphite transition hover:border-azure/40 hover:bg-blue-50 hover:text-azure disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-graphite transition hover:border-azure/40 hover:bg-blue-50 hover:text-azure disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
         >
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           {refining ? 'Improving...' : 'Improve text'}
@@ -60,35 +60,35 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
           type="button"
           onClick={onExtract}
           disabled={loading || value.trim().length === 0}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-azure px-4 text-sm font-semibold text-white shadow-glow transition hover:bg-azureDark disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-azure px-3 text-xs font-semibold text-white shadow-glow transition hover:bg-azureDark disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
         >
           <Search className="h-4 w-4" aria-hidden="true" />
           {loading ? 'Finding...' : 'Find services'}
         </button>
       </div>
       {showRefinedPrompt ? (
-        <div className="mt-5 rounded-lg border border-violet/20 bg-violet/5 p-4">
+        <div className="mt-4 rounded-md border border-violet/20 bg-violet/5 p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-navy">Improved text is ready</h3>
-            <p className="mt-1 text-sm leading-6 text-muted">Review it quickly. If it looks right, use it and then click Find services.</p>
+            <h3 className="text-xs font-semibold text-navy">Improved text is ready</h3>
+            <p className="mt-0.5 text-xs leading-5 text-muted">Review it quickly, then use it.</p>
           </div>
           <button
             type="button"
             onClick={() => onChange(refinedPrompt)}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-violet px-3 text-xs font-semibold text-white transition hover:bg-plum"
+            className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-violet px-3 text-xs font-semibold text-white transition hover:bg-plum"
           >
             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
             Use improved text
           </button>
         </div>
-        <label className="mt-4 block">
-          <span className="text-sm font-semibold text-graphite">Improved text</span>
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold uppercase text-graphite">Improved text</span>
           <textarea
             value={refinedPrompt}
             onChange={(event) => setRefinedPrompt(event.target.value)}
-            rows={10}
-            className="mt-2 w-full resize-y rounded-lg border border-slate-300 bg-white px-4 py-3 font-mono text-sm leading-6 text-ink outline-none transition focus:border-violet focus:ring-4 focus:ring-violet/15"
+            rows={8}
+            className="mt-1.5 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs leading-5 text-ink outline-none transition focus:border-violet focus:ring-4 focus:ring-violet/15"
           />
         </label>
       </div>
