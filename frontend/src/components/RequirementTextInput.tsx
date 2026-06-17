@@ -1,15 +1,17 @@
 import { CheckCircle2, FileText, Search, Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import type { Provider } from '../types/estimate';
 
 interface RequirementTextInputProps {
   value: string;
   loading: boolean;
+  provider: Provider;
   onChange: (value: string) => void;
   onExtract: () => void;
-  onRefine: (value: string) => Promise<string>;
+  onRefine: (value: string, provider: Provider) => Promise<string>;
 }
 
-export function RequirementTextInput({ value, loading, onChange, onExtract, onRefine }: RequirementTextInputProps) {
+export function RequirementTextInput({ value, loading, provider, onChange, onExtract, onRefine }: RequirementTextInputProps) {
   const [showRefinedPrompt, setShowRefinedPrompt] = useState(false);
   const [refinedPrompt, setRefinedPrompt] = useState('');
   const [refining, setRefining] = useState(false);
@@ -17,9 +19,9 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
   async function handleReviewRefine() {
     setRefining(true);
     try {
-      setRefinedPrompt(await onRefine(value));
+      setRefinedPrompt(await onRefine(value, provider));
     } catch {
-      setRefinedPrompt(refinePrompt(value));
+      setRefinedPrompt(refinePrompt(value, provider));
     } finally {
       setShowRefinedPrompt(true);
       setRefining(false);
@@ -27,23 +29,23 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
   }
 
   return (
-    <section className="overflow-hidden rounded-md border border-slate-300 bg-white shadow-card">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+    <section className="overflow-hidden rounded-xl border border-line bg-white shadow-card">
+      <div className="border-b border-lineSoft bg-slate-50/60 px-5 py-4">
         <div className="dashboard-kicker text-azure">
           <FileText className="h-3.5 w-3.5" aria-hidden="true" />
           Step 1
         </div>
-        <h2 className="mt-2 text-base font-semibold text-navy">Describe cloud needs</h2>
+        <h2 className="mt-2.5 text-base font-bold text-navy">Describe cloud needs</h2>
         <p className="mt-0.5 text-xs leading-5 text-muted">Paste the requirement, improve it if needed, then find services.</p>
       </div>
-      <div className="p-4">
+      <div className="p-5">
       <label className="block">
         <span className="text-xs font-semibold uppercase text-graphite">Requirement text</span>
         <textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}
           rows={9}
-          className="mt-1.5 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs leading-5 text-ink outline-none transition placeholder:text-slate-400 focus:border-azure focus:ring-4 focus:ring-blue-100"
+          className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs leading-5 text-ink outline-none transition placeholder:text-slate-400 focus:border-azure focus:ring-4 focus:ring-blue-100"
         />
       </label>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -51,7 +53,7 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
           type="button"
           onClick={handleReviewRefine}
           disabled={refining || value.trim().length === 0}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-graphite transition hover:border-azure/40 hover:bg-blue-50 hover:text-azure disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-graphite transition hover:border-azure/40 hover:bg-blue-50 hover:text-azure disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
         >
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           {refining ? 'Improving...' : 'Improve text'}
@@ -60,23 +62,23 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
           type="button"
           onClick={onExtract}
           disabled={loading || value.trim().length === 0}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-azure px-3 text-xs font-semibold text-white shadow-glow transition hover:bg-azureDark disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-brand-accent px-3.5 text-xs font-semibold text-white shadow-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
         >
           <Search className="h-4 w-4" aria-hidden="true" />
           {loading ? 'Finding...' : 'Find services'}
         </button>
       </div>
       {showRefinedPrompt ? (
-        <div className="mt-4 rounded-md border border-violet/20 bg-violet/5 p-3">
+        <div className="mt-4 rounded-xl border border-violet/20 bg-violet/5 p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-xs font-semibold text-navy">Improved text is ready</h3>
+            <h3 className="text-xs font-bold text-navy">Improved text is ready</h3>
             <p className="mt-0.5 text-xs leading-5 text-muted">Review it quickly, then use it.</p>
           </div>
           <button
             type="button"
             onClick={() => onChange(refinedPrompt)}
-            className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-violet px-3 text-xs font-semibold text-white transition hover:bg-plum"
+            className="inline-flex h-8 items-center justify-center gap-2 rounded-lg bg-brand-violet px-3 text-xs font-semibold text-white transition hover:brightness-110"
           >
             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
             Use improved text
@@ -88,7 +90,7 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
             value={refinedPrompt}
             onChange={(event) => setRefinedPrompt(event.target.value)}
             rows={8}
-            className="mt-1.5 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs leading-5 text-ink outline-none transition focus:border-violet focus:ring-4 focus:ring-violet/15"
+            className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-mono text-xs leading-5 text-ink outline-none transition focus:border-violet focus:ring-4 focus:ring-violet/15"
           />
         </label>
       </div>
@@ -98,18 +100,19 @@ export function RequirementTextInput({ value, loading, onChange, onExtract, onRe
   );
 }
 
-function refinePrompt(input: string): string {
+function refinePrompt(input: string, provider: Provider = 'azure'): string {
   const intentText = promptIntentText(input);
   const normalized = intentText.toLowerCase().replace(/\s+/g, ' ').trim();
   const sections: string[] = [];
-  const region = /\b(east us|us east)\b/i.test(intentText) ? 'Azure East US' : 'Azure region not specified';
-  const dictionary = azureDictionaryLines(normalized);
+  const profile = providerProfile(provider);
+  const region = regionLabelFromText(intentText, provider) ?? `${profile.label} region not specified`;
+  const dictionary = serviceDictionaryLines(normalized, provider);
 
   if (dictionary.length > 0) {
-    sections.push(`Azure Service Dictionary:\n${dictionary.map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`${profile.label} Service Dictionary:\n${dictionary.map((line) => `- ${line}`).join('\n')}`);
   }
 
-  const kubernetes = kubernetesLines(normalized, intentText);
+  const kubernetes = kubernetesLines(normalized, intentText, provider);
   if (kubernetes.length > 0) {
     sections.push(`Kubernetes:\n${kubernetes.map((line) => `- ${line}`).join('\n')}`);
   }
@@ -134,7 +137,7 @@ function refinePrompt(input: string): string {
     sections.push(`CDN:\n${cdn.map((line) => `- ${line}`).join('\n')}`);
   }
 
-  const loadBalancer = loadBalancerLines(normalized);
+  const loadBalancer = loadBalancerLines(normalized, provider);
   if (loadBalancer.length > 0) {
     sections.push(`Load Balancer:\n${loadBalancer.map((line) => `- ${line}`).join('\n')}`);
   }
@@ -181,6 +184,75 @@ function refinePrompt(input: string): string {
   return [`I need infrastructure in ${region}.`, ...sections].join('\n\n');
 }
 
+function regionLabelFromText(input: string, provider: Provider): string | null {
+  const raw = input.toLowerCase();
+  const normalized = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (
+    /\b(east us|us east|us east 1|us east1)\b/.test(normalized) ||
+    /(^|[^a-z0-9])(eastus|useast)([^a-z0-9]|$)/.test(raw)
+  ) {
+    return providerProfile(provider).eastUsLabel;
+  }
+
+  return null;
+}
+
+function providerProfile(provider: Provider): { label: string; eastUsLabel: string; services: Record<string, string> } {
+  const profiles: Record<Provider, { label: string; eastUsLabel: string; services: Record<string, string> }> = {
+    azure: {
+      label: 'Azure',
+      eastUsLabel: 'Azure East US',
+      services: {
+        kubernetes: 'Azure Kubernetes Service (AKS)',
+        compute: 'Azure Virtual Machines',
+        postgres: 'Azure Database for PostgreSQL Flexible Server',
+        redis: 'Azure Cache for Redis',
+        storage: 'Azure Blob Storage',
+        cdn: 'Azure CDN / Azure Front Door',
+        loadBalancer: 'Azure Application Gateway',
+        queue: 'Azure Service Bus',
+        monitoring: 'Azure Monitor / Log Analytics',
+        backup: 'Azure Backup'
+      }
+    },
+    aws: {
+      label: 'AWS',
+      eastUsLabel: 'AWS US East (N. Virginia)',
+      services: {
+        kubernetes: 'Amazon EKS',
+        compute: 'Amazon EC2',
+        postgres: 'Amazon RDS for PostgreSQL',
+        redis: 'Amazon ElastiCache for Redis',
+        storage: 'Amazon S3',
+        cdn: 'Amazon CloudFront',
+        loadBalancer: 'Application Load Balancer',
+        queue: 'Amazon SQS / EventBridge',
+        monitoring: 'Amazon CloudWatch',
+        backup: 'AWS Backup'
+      }
+    },
+    gcp: {
+      label: 'GCP',
+      eastUsLabel: 'GCP us-east1',
+      services: {
+        kubernetes: 'Google Kubernetes Engine (GKE)',
+        compute: 'Compute Engine',
+        postgres: 'Cloud SQL for PostgreSQL',
+        redis: 'Memorystore for Redis',
+        storage: 'Cloud Storage',
+        cdn: 'Cloud CDN',
+        loadBalancer: 'Cloud Load Balancing',
+        queue: 'Pub/Sub',
+        monitoring: 'Cloud Monitoring / Cloud Logging',
+        backup: 'Backup and DR Service'
+      }
+    }
+  };
+
+  return profiles[provider];
+}
+
 function promptIntentText(input: string): string {
   const promptMatch = input.match(/\bprompt\s*:\s*/i);
   if (!promptMatch || promptMatch.index === undefined) {
@@ -194,12 +266,13 @@ function promptIntentText(input: string): string {
   return [beforePrompt, promptBody].filter(Boolean).join('\n');
 }
 
-function kubernetesLines(text: string, rawText: string): string[] {
+function kubernetesLines(text: string, rawText: string, provider: Provider): string[] {
   if (!/(kubernetes|aks|worker nodes?)/i.test(text)) {
     return [];
   }
 
-  const lines = ['AKS cluster (Azure Kubernetes Service)'];
+  const serviceName = providerProfile(provider).services.kubernetes;
+  const lines = [`Kubernetes cluster (${serviceName})`];
   const serviceCount = numberBefore(text, /(microservices|services)/);
   const services = microserviceNames(rawText);
   const nodeCount = workerNodeCount(text);
@@ -291,14 +364,15 @@ function cdnLines(text: string): string[] {
   return lines;
 }
 
-function loadBalancerLines(text: string): string[] {
+function loadBalancerLines(text: string, provider: Provider): string[] {
   if (!/(load balancer|ingress)/i.test(text)) {
     return [];
   }
 
   const lines: string[] = [];
-  if (/\b(http\/s|https|http|layer 7|l7|ingress)\b/i.test(text)) lines.push('Azure service: Azure Application Gateway');
-  if (/\b(tcp|udp|layer 4|l4)\b/i.test(text)) lines.push('Azure service: Azure Load Balancer');
+  const profile = providerProfile(provider);
+  if (/\b(http\/s|https|http|layer 7|l7|ingress)\b/i.test(text)) lines.push(`${profile.label} service: ${profile.services.loadBalancer}`);
+  if (/\b(tcp|udp|layer 4|l4)\b/i.test(text)) lines.push(`${profile.label} service: ${provider === 'azure' ? 'Azure Load Balancer' : profile.services.loadBalancer}`);
   if (/\b(http\/s|https|http|layer 7|l7)\b/i.test(text)) lines.push('Type: HTTP/S');
   if (/\b(tcp|udp|layer 4|l4)\b/i.test(text)) lines.push('Type: TCP');
   if (/api gateway/i.test(text)) lines.push('Target: API Gateway service');
@@ -374,18 +448,19 @@ function pricingLines(text: string): string[] {
   return lines;
 }
 
-function azureDictionaryLines(text: string): string[] {
+function serviceDictionaryLines(text: string, provider: Provider): string[] {
   const lines: string[] = [];
-  if (/(kubernetes|aks|worker nodes?)/i.test(text)) lines.push('Kubernetes -> Azure Kubernetes Service (AKS)');
-  if (/(web server|server|vm|virtual machine)/i.test(text)) lines.push('VMs / servers -> Azure Virtual Machines');
-  if (/(postgres|postgresql|database)/i.test(text)) lines.push('Managed PostgreSQL -> Azure Database for PostgreSQL Flexible Server');
-  if (/(redis|cache)/i.test(text)) lines.push('Redis cache -> Azure Cache for Redis');
-  if (/(object storage|product images|invoices|exported reports)/i.test(text)) lines.push('Object storage -> Azure Blob Storage');
-  if (/(cdn|static assets)/i.test(text)) lines.push('CDN/static assets -> Azure CDN / Azure Front Door');
-  if (/(load balancer|ingress)/i.test(text)) lines.push('HTTP/S load balancer or ingress -> Azure Application Gateway');
-  if (/(message queue|event bus|asynchronous events|messages)/i.test(text)) lines.push('Message queue/event bus -> Azure Service Bus');
-  if (/(monitoring|logging|log ingestion|logs)/i.test(text)) lines.push('Monitoring/logging -> Azure Monitor / Log Analytics');
-  if (/\bbackup\b/i.test(text)) lines.push('Backup -> Azure Backup');
+  const services = providerProfile(provider).services;
+  if (/(kubernetes|aks|worker nodes?)/i.test(text)) lines.push(`Kubernetes -> ${services.kubernetes}`);
+  if (/(web server|server|vm|virtual machine)/i.test(text)) lines.push(`VMs / servers -> ${services.compute}`);
+  if (/(postgres|postgresql|database)/i.test(text)) lines.push(`Managed PostgreSQL -> ${services.postgres}`);
+  if (/(redis|cache)/i.test(text)) lines.push(`Redis cache -> ${services.redis}`);
+  if (/(object storage|product images|invoices|exported reports)/i.test(text)) lines.push(`Object storage -> ${services.storage}`);
+  if (/(cdn|static assets)/i.test(text)) lines.push(`CDN/static assets -> ${services.cdn}`);
+  if (/(load balancer|ingress)/i.test(text)) lines.push(`HTTP/S load balancer or ingress -> ${services.loadBalancer}`);
+  if (/(message queue|event bus|asynchronous events|messages)/i.test(text)) lines.push(`Message queue/event bus -> ${services.queue}`);
+  if (/(monitoring|logging|log ingestion|logs)/i.test(text)) lines.push(`Monitoring/logging -> ${services.monitoring}`);
+  if (/\bbackup\b/i.test(text)) lines.push(`Backup -> ${services.backup}`);
   return lines;
 }
 

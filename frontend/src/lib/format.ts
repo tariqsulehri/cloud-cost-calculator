@@ -35,17 +35,31 @@ export function confidenceDescription(confidence: Confidence): string {
 }
 
 export function pricingSourceLabel(source: PricingSource): string {
-  return source === 'azure-retail-prices-api' ? 'Azure price' : 'Fallback';
+  if (source === 'azure-retail-prices-api') {
+    return 'Azure price';
+  }
+  if (source === 'early-proposal-rate-card') {
+    return 'Early proposal';
+  }
+  return 'Fallback';
 }
 
 export function pricingSourceDescription(source: PricingSource): string {
-  return source === 'azure-retail-prices-api'
-    ? 'Price came from the Azure public pricing API.'
-    : 'The exact Azure price was not found. Review before using this cost.';
+  if (source === 'azure-retail-prices-api') {
+    return 'Price came from the Azure public pricing API.';
+  }
+  if (source === 'early-proposal-rate-card') {
+    return 'Planning rate only. Validate with provider calculator or contract pricing before final quote.';
+  }
+  return 'The exact price was not found. Review before using this cost.';
 }
 
 export function pricingSourceClass(source: PricingSource): string {
-  return source === 'azure-retail-prices-api'
-    ? 'bg-blue-50 text-blue-700 border-blue-200'
-    : 'bg-slate-100 text-slate-700 border-slate-300';
+  if (source === 'azure-retail-prices-api') {
+    return 'bg-blue-50 text-blue-700 border-blue-200';
+  }
+  if (source === 'early-proposal-rate-card') {
+    return 'bg-amber-50 text-amber-800 border-amber-200';
+  }
+  return 'bg-slate-100 text-slate-700 border-slate-300';
 }

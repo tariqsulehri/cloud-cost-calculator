@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { createNaturalLanguageEstimate, extractRequirements, refineRequirements, searchCatalogServices } from './lib/api';
-import type { CatalogService, NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement } from './types/estimate';
+import type { CatalogService, NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement, Provider } from './types/estimate';
 
 vi.mock('./lib/api', () => ({
   extractRequirements: vi.fn(),
@@ -104,6 +104,44 @@ const estimateResponse: NaturalLanguageEstimateResponse = {
   clarifyingQuestions: ['Should PostgreSQL be highly available?']
 };
 
+function estimateForProvider(provider: Provider): NaturalLanguageEstimateResponse {
+  if (provider === 'azure') {
+    return estimateResponse;
+  }
+
+  const label = provider === 'aws' ? 'AWS' : 'GCP';
+  return {
+    ...estimateResponse,
+    provider,
+    region: provider === 'aws' ? 'us-east-1' : 'us-east1',
+    totalMonthlyCost: provider === 'aws' ? 466.64 : 430.12,
+    estimateQuality: {
+      status: 'partial',
+      coveragePercent: 67,
+      pricedComponentCount: 2,
+      totalComponentCount: 3,
+      summary: `${label} partial early proposal estimate: 2/3 detected services are priced. Unpriced services are excluded from the total.`,
+      blockers: ['PostgreSQL database: Missing high availability setting.']
+    },
+    calculatedLineItems: [
+      {
+        ...estimateResponse.calculatedLineItems[0],
+        serviceName: provider === 'aws' ? 'EC2' : 'Compute Engine',
+        skuName: provider === 'aws' ? 'm7i.xlarge planning size' : 'n2-standard-4 planning size',
+        unitPrice: provider === 'aws' ? 0.26 : 0.24,
+        monthlyCost: provider === 'aws' ? 379.6 : 350.4,
+        pricingSource: 'early-proposal-rate-card',
+        confidence: 'low',
+        rawProductName: null,
+        rawSkuName: null,
+        rawMeterName: null,
+        rawArmRegionName: null
+      }
+    ],
+    assumptions: [`${label} uses an early proposal rate card. It is not connected to live provider pricing APIs yet.`]
+  };
+}
+
 const extractedWithMissingStorage: NormalizedInfrastructureRequirement = {
   ...extractedRequirements,
   components: extractedRequirements.components.map((component) =>
@@ -115,6 +153,22 @@ const extractedWithMissingStorage: NormalizedInfrastructureRequirement = {
         }
       : component
   )
+};
+
+const extractedWithMissingStorageType: NormalizedInfrastructureRequirement = {
+  ...extractedRequirements,
+  components: extractedRequirements.components.map((component) =>
+    component.id === 'database-1'
+      ? {
+          ...component,
+          storageType: null,
+          highAvailability: true,
+          missingFields: ['storageType'],
+          pricingStatus: 'missing_required_fields'
+        }
+      : component
+  ),
+  clarifyingQuestions: []
 };
 
 const extractedKubernetesRequirements: NormalizedInfrastructureRequirement = {
@@ -183,6 +237,9 @@ const mappedCatalogServices: CatalogService[] = [
     pricingServiceName: 'Azure Cache for Redis',
     serviceFamily: 'Cache',
     defaultPricingStatus: 'supported',
+    sourceCategory: 'Databases',
+    mappingStatus: 'mapped',
+    notes: null,
     aliases: ['redis', 'cache'],
     requiredFields: ['tier', 'memoryGb']
   },
@@ -196,6 +253,9 @@ const mappedCatalogServices: CatalogService[] = [
     pricingServiceName: 'Amazon ElastiCache',
     serviceFamily: 'Cache',
     defaultPricingStatus: 'not_implemented',
+    sourceCategory: 'Databases',
+    mappingStatus: 'mapped',
+    notes: null,
     aliases: ['redis', 'cache'],
     requiredFields: ['tier', 'memoryGb']
   },
@@ -209,6 +269,9 @@ const mappedCatalogServices: CatalogService[] = [
     pricingServiceName: 'Memorystore',
     serviceFamily: 'Cache',
     defaultPricingStatus: 'not_implemented',
+    sourceCategory: 'Databases',
+    mappingStatus: 'mapped',
+    notes: null,
     aliases: ['redis', 'cache'],
     requiredFields: ['tier', 'memoryGb']
   }
@@ -273,7 +336,7 @@ describe('App', () => {
   beforeEach(() => {
     vi.mocked(extractRequirements).mockResolvedValue(extractedRequirements);
     vi.mocked(refineRequirements).mockImplementation(async (value: string) => value);
-    vi.mocked(createNaturalLanguageEstimate).mockResolvedValue(estimateResponse);
+    vi.mocked(createNaturalLanguageEstimate).mockImplementation(async (payload) => estimateForProvider(payload.provider));
     vi.mocked(searchCatalogServices).mockImplementation(async (query = '', options = {}) => {
       const normalizedQuery = query.toLowerCase();
       return mappedCatalogServices.filter((service) => {
@@ -311,7 +374,7 @@ describe('App', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: /Service Mapping/ }));
     expect(screen.getByLabelText('Cloud provider')).toBeInTheDocument();
-    expect(screen.getByLabelText('Search and select service')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search service')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('option', { name: /Amazon ElastiCache for Redis/ }));
 
     expect(await screen.findByText('Azure Cache for Redis')).toBeInTheDocument();
@@ -395,6 +458,46 @@ Database:
     expect(refinedTextarea.value).not.toContain('Load Balancer');
   });
 
+  it('normalizes useast to Azure East US when improving text locally', async () => {
+    vi.mocked(refineRequirements).mockRejectedValueOnce(new Error('fallback to local refine'));
+    render(<App />);
+
+    const textarea = screen.getByLabelText('Requirement text');
+    await userEvent.clear(textarea);
+    await userEvent.type(
+      textarea,
+      `I need 2 Linux Ubuntu virtual machines in useast.
+Each VM should have 2 vCPU and 8 GB RAM.
+They run 730 hours per month.`
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Improve text' }));
+    const refinedTextarea = screen.getByLabelText('Improved text') as HTMLTextAreaElement;
+
+    expect(refinedTextarea.value).toContain('I need infrastructure in Azure East US.');
+    expect(refinedTextarea.value).not.toContain('Azure region not specified');
+  });
+
+  it('uses AWS wording when AWS is selected before improving text locally', async () => {
+    vi.mocked(refineRequirements).mockRejectedValueOnce(new Error('fallback to local refine'));
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /AWS/ }));
+    const textarea = screen.getByLabelText('Requirement text');
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, 'I need 2 Linux Ubuntu virtual machines with Redis in useast.');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Improve text' }));
+    const refinedTextarea = screen.getByLabelText('Improved text') as HTMLTextAreaElement;
+
+    expect(refineRequirements).toHaveBeenCalledWith(expect.any(String), { provider: 'aws' });
+    expect(refinedTextarea.value).toContain('I need infrastructure in AWS US East (N. Virginia).');
+    expect(refinedTextarea.value).toContain('AWS Service Dictionary:');
+    expect(refinedTextarea.value).toContain('VMs / servers -> Amazon EC2');
+    expect(refinedTextarea.value).toContain('Redis cache -> Amazon ElastiCache for Redis');
+    expect(refinedTextarea.value).not.toContain('Azure Service Dictionary:');
+  });
+
   it('refines the production AKS microservices prompt without dropping platform services', async () => {
     vi.mocked(refineRequirements).mockRejectedValueOnce(new Error('fallback to local refine'));
     render(<App />);
@@ -408,7 +511,7 @@ Database:
     expect(refinedTextarea.value).toContain('Azure Service Dictionary:');
     expect(refinedTextarea.value).toContain('Kubernetes -> Azure Kubernetes Service (AKS)');
     expect(refinedTextarea.value).toContain('Kubernetes:');
-    expect(refinedTextarea.value).toContain('AKS cluster');
+    expect(refinedTextarea.value).toContain('Kubernetes cluster');
     expect(refinedTextarea.value).toContain('8 microservices');
     expect(refinedTextarea.value).toContain('4 Linux worker nodes');
     expect(refinedTextarea.value).toContain('Each worker node: 8 vCPU, 32 GB RAM');
@@ -444,7 +547,7 @@ Database:
     expect(screen.getByText('AI-assisted')).toBeInTheDocument();
     expect(screen.getByText('Azure region')).toBeInTheDocument();
     expect(screen.getByText('eastus')).toBeInTheDocument();
-    expect(screen.getByText("Azure pricing is active now. Services marked Need info, Price not ready, or Can't price are not included in the total.")).toBeInTheDocument();
+    expect(screen.getByText("Azure pricing is active where adapters exist. Services marked Need info, Price not ready, or Can't price are not included in the total.")).toBeInTheDocument();
     expect(screen.getByText('database')).toBeInTheDocument();
   });
 
@@ -489,6 +592,67 @@ Database:
     expect(await screen.findByRole('button', { name: 'Calculate Azure cost' })).toBeInTheDocument();
   });
 
+  it('calculates AWS early proposal estimate from the provider tile', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /AWS/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Calculate AWS cost' }));
+
+    await waitFor(() => expect(screen.getByText(/Step 3 .* AWS estimate/i)).toBeInTheDocument());
+    expect(screen.getByText('Early proposal')).toBeInTheDocument();
+    expect(screen.getAllByText('$466.64').length).toBeGreaterThan(0);
+  });
+
+  it('calculates and compares all providers', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Compare/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Calculate all providers' }));
+
+    await waitFor(() => expect(screen.getByText('Cloud cost comparison')).toBeInTheDocument());
+    expect(createNaturalLanguageEstimate).toHaveBeenCalledWith(expect.objectContaining({ provider: 'azure' }));
+    expect(createNaturalLanguageEstimate).toHaveBeenCalledWith(expect.objectContaining({ provider: 'aws' }));
+    expect(createNaturalLanguageEstimate).toHaveBeenCalledWith(expect.objectContaining({ provider: 'gcp' }));
+    expect(screen.getAllByText('$280.32').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$466.64').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$430.12').length).toBeGreaterThan(0);
+    expect(screen.getByText('Detailed service costs')).toBeInTheDocument();
+    expect(screen.getByText('Not calculated')).toBeInTheDocument();
+    expect(screen.getAllByText('Azure Database for PostgreSQL').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByLabelText('Show similar cost idea'));
+    expect(screen.getByText('Similar cost / remarks')).toBeInTheDocument();
+    expect(screen.getAllByText('Remark: guide only, not included in total.').length).toBeGreaterThan(0);
+  });
+
+  it('adds selected optional Azure add-ons to the estimate request', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    await userEvent.click(await screen.findByLabelText(/NAT Gateway/));
+    await userEvent.type(screen.getByLabelText('Processed GB'), '500');
+    await userEvent.click(await screen.findByRole('button', { name: 'Calculate Azure cost' }));
+
+    await waitFor(() =>
+      expect(createNaturalLanguageEstimate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'azure',
+          requirements: expect.objectContaining({
+            components: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'optional-nat-gateway',
+                optionalAddon: 'nat-gateway',
+                gatewayCount: 1,
+                monthlyDataProcessedGb: 500
+              })
+            ])
+          })
+        })
+      )
+    );
+  });
+
   it('enables Calculate Azure cost for AKS worker node compute', async () => {
     vi.mocked(extractRequirements).mockResolvedValueOnce(extractedKubernetesRequirements);
     render(<App />);
@@ -522,6 +686,19 @@ Database:
     await waitFor(() => expect(screen.getByRole('button', { name: 'Calculate Azure cost' })).toBeEnabled());
   });
 
+  it('lets users resolve missing fields with proposal suggestions', async () => {
+    vi.mocked(extractRequirements).mockResolvedValueOnce(extractedKubernetesMissingNodeCount);
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    expect(await screen.findByText('Missing: nodeCount')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Use suggestions' }));
+
+    expect(screen.queryByText('Missing: nodeCount')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Calculate Azure cost' })).toBeEnabled());
+  });
+
   it('adds selected clarification answers to the prompt', async () => {
     render(<App />);
 
@@ -548,13 +725,30 @@ Database:
     expect(screen.queryByText('Missing: storageGb')).not.toBeInTheDocument();
   });
 
+  it('asks for database storage type using provider-specific choices', async () => {
+    vi.mocked(extractRequirements).mockResolvedValueOnce(extractedWithMissingStorageType);
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
+    expect(await screen.findByText('Missing: storageType')).toBeInTheDocument();
+
+    const storageTypeSelect = screen.getByLabelText('Azure storage type');
+    expect(storageTypeSelect).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'SSD (Azure Premium/Standard SSD)' })).toBeInTheDocument();
+
+    await userEvent.selectOptions(storageTypeSelect, 'ssd');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
+
+    expect(screen.queryByText('Missing: storageType')).not.toBeInTheDocument();
+  });
+
   it('shows estimate summary after successful estimate', async () => {
     render(<App />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Find services' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Calculate Azure cost' }));
 
-    await waitFor(() => expect(screen.getByText('Step 3: Azure Estimate')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Step 3 .* Azure estimate/i)).toBeInTheDocument());
     expect(screen.getAllByText('$280.32').length).toBeGreaterThan(0);
     expect(screen.getByText('Azure Database for PostgreSQL')).toBeInTheDocument();
   });

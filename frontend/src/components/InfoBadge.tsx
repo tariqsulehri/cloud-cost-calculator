@@ -15,7 +15,7 @@ export function InfoBadge({ label, tooltip, className, align = 'right' }: InfoBa
       {label}
       <span
         role="tooltip"
-        className={`pointer-events-none absolute top-full z-30 mt-2 hidden w-56 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-xs font-medium leading-5 text-slate-700 shadow-card group-hover:block ${
+        className={`pointer-events-none absolute top-full z-30 mt-2 hidden w-56 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-medium leading-5 text-slate-700 shadow-cardHover group-hover:block ${
           align === 'left' ? 'left-0' : 'right-0'
         }`}
       >

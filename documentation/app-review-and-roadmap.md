@@ -34,6 +34,9 @@ The app can:
 - Search service mapping across Azure, AWS, and GCP.
 - Show a guided AI help preview for plain-English estimate questions.
 - Calculate supported Azure cost lines.
+- Add optional Azure costs such as Managed Disks, NAT Gateway, Firewall, Public IP, Private Endpoint, App Service, SQL Database, Key Vault, Backup, DNS, Front Door, and Container Apps.
+- Calculate early proposal AWS and GCP cost lines using planning rates.
+- Compare Azure, AWS, and GCP totals side by side.
 - Show unpriced services separately.
 - Keep unsupported items visible instead of adding fake cost.
 
@@ -50,7 +53,26 @@ Current Azure pricing support includes selected meters for:
 - Azure Monitor / Log Analytics
 - Azure Database for PostgreSQL Flexible Server
 
+Optional Azure add-ons use early proposal planning rates today. They are useful for first proposal sizing, but they should be validated with Azure Calculator or exact Azure Retail Prices API meter adapters before a final client quote.
+
 Some of these services still have limited pricing coverage. The app explains these limits in assumptions and unpriced sections.
+
+## 2.1 Phase 1 Catalog Foundation
+
+Phase 1 imports the cloud service mapping from `Cloud_Services_Mapping.xlsx`.
+
+Current catalog result:
+
+- 138 service mapping groups from the Excel file.
+- Azure, AWS, and GCP rows for each mapping group.
+- Extra curated rows for pricing helpers already used by the app.
+- Source category saved with each service.
+- Mapping status saved with each service:
+  - `mapped`: a matching service exists.
+  - `no_direct_equivalent`: the source file says there is no direct equivalent.
+  - `manual_review`: the source file has a mapping, but also says review is needed.
+
+Important: this is a service catalog and mapping foundation. It does not mean AWS and GCP pricing is active yet.
 
 ## 3. What Is Not Possible Yet
 
@@ -58,14 +80,15 @@ The app cannot yet give a full production cloud bill.
 
 Important limits:
 
-- AWS cost calculation is not implemented yet.
-- GCP cost calculation is not implemented yet.
-- Combined Azure vs AWS vs GCP comparison is not implemented yet.
+- AWS live provider pricing is not implemented yet.
+- GCP live provider pricing is not implemented yet.
+- AWS and GCP currently use early proposal planning rates only.
 - Enterprise discounts are not applied.
 - Reserved instances and savings plans are not applied.
 - Taxes are not included.
 - Currency conversion is not included.
 - Some Azure meters are excluded unless explicitly modeled.
+- Optional Azure add-ons are priced only when the user selects them and fills the required fields.
 - Some services need manual review when sizing is missing.
 
 The app should say "Price not ready" or "Can't price" instead of showing wrong numbers.
@@ -84,13 +107,18 @@ Current limitations:
 - Does not use customer contract prices.
 - Does not include all dependent services automatically.
 - Does not include every storage operation, backup, snapshot, private endpoint, public IP, firewall, DNS, WAF, or support charge.
+- Optional items can be selected manually for early proposal pricing.
 - Some VM sizes require manual SKU mapping.
 
 ### AWS
 
-AWS is planned.
+AWS early proposal estimate is active.
 
-Needed before AWS calculation:
+Current limitation:
+
+- Uses internal planning rates, not live AWS Pricing API.
+
+Needed before final AWS calculation:
 
 - AWS pricing adapter.
 - AWS service SKU mapping.
@@ -100,9 +128,13 @@ Needed before AWS calculation:
 
 ### GCP
 
-GCP is planned.
+GCP early proposal estimate is active.
 
-Needed before GCP calculation:
+Current limitation:
+
+- Uses internal planning rates, not live Google Cloud pricing data.
+
+Needed before final GCP calculation:
 
 - GCP pricing adapter.
 - GCP service SKU mapping.
@@ -112,7 +144,7 @@ Needed before GCP calculation:
 
 ### Combined Cost View
 
-Combined view is planned.
+Combined view is active for early comparison.
 
 It should compare:
 
@@ -124,7 +156,7 @@ It should compare:
 - Services not priced for each provider
 - Confidence level for each provider
 
-The combined view should not compare fake totals. A provider total should be marked partial if some services are missing.
+The combined view should not hide weak coverage. A provider total should be marked partial if some services are missing.
 
 ## 5. Multi-Cloud UI Plan
 
@@ -143,19 +175,19 @@ Status: active now.
 
 ### AWS Tab
 
-Will show AWS estimate after AWS pricing is implemented.
+Shows AWS early proposal estimate.
 
-Status: planned.
+Status: active for planning only.
 
 ### GCP Tab
 
-Will show GCP estimate after GCP pricing is implemented.
+Shows GCP early proposal estimate.
 
-Status: planned.
+Status: active for planning only.
 
 ### Compare Tab
 
-Will show side-by-side totals.
+Shows side-by-side totals.
 
 Recommended layout:
 
@@ -247,6 +279,8 @@ The process should stay simple.
      - Price not ready
      - Can't price
    - User fills missing fields.
+   - User can select optional Azure add-ons if the customer needs them.
+   - Optional add-ons say Need info until all required values are filled.
 
 3. Calculate
    - User clicks Calculate cost.

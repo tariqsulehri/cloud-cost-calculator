@@ -74,9 +74,9 @@ export class RequirementExtractionService {
   }
 
   private extractRegion(text: string) {
-    const eastUsMatch = text.match(/\b(us east|east us)\b/i);
+    const eastUsMatch = this.matchEastUsRegion(text);
     return {
-      raw: eastUsMatch?.[0] ?? null,
+      raw: eastUsMatch ?? null,
       normalized: 'eastus',
       providerRegion: {
         azure: 'eastus',
@@ -85,6 +85,18 @@ export class RequirementExtractionService {
       },
       confidence: eastUsMatch ? 'high' : 'medium'
     } as const;
+  }
+
+  private matchEastUsRegion(text: string): string | null {
+    const raw = text.toLowerCase();
+    const normalized = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const phrase = normalized.match(/\b(east us|us east|us east 1|us east1)\b/);
+    if (phrase) {
+      return phrase[0];
+    }
+
+    const compact = raw.match(/(^|[^a-z0-9])(eastus|useast)([^a-z0-9]|$)/);
+    return compact?.[2] ?? null;
   }
 
   private extractCompute(text: string): ComputeComponent | null {

@@ -86,7 +86,7 @@ describe('RequirementPostProcessor', () => {
         providerServiceHint: { azure: 'Azure Database for PostgreSQL', aws: null, gcp: null },
         pricingStatus: 'not_implemented',
         confidence: 'medium',
-        missingFields: ['storageGb'],
+        missingFields: ['storageGb', 'storageType'],
         assumptions: [],
         rawText: 'Managed PostgreSQL database - 8 vCPU, 32 GB RAM - storage: 1 TB SSD',
         engine: 'postgresql',

@@ -83,11 +83,7 @@ estimateRouter.post('/estimate', async (req, res, next) => {
     if ('requirements' in req.body) {
       const payload = normalizedEstimateSchema.parse(req.body);
 
-      if (payload.provider !== 'azure') {
-        throw new HttpError(400, 'Only Azure is supported in this MVP.');
-      }
-
-      if (!isSupportedAzureRegion(payload.requirements.region.providerRegion.azure)) {
+      if (payload.provider === 'azure' && !isSupportedAzureRegion(payload.requirements.region.providerRegion.azure)) {
         throw new HttpError(400, `Unsupported Azure region: ${payload.requirements.region.providerRegion.azure}`);
       }
 

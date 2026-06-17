@@ -32,17 +32,50 @@ describe('CloudCatalogDatabase', () => {
   it('lists provider services with aliases and required pricing fields', () => {
     const catalog = createCatalog();
     const services = catalog.listServices({ provider: 'azure', query: 'redis' });
+    const redisCache = services.find((service) => service.serviceKey === 'cache.redis');
 
-    expect(services).toHaveLength(1);
-    expect(services[0]).toMatchObject({
+    expect(services.length).toBeGreaterThanOrEqual(2);
+    expect(redisCache).toMatchObject({
       serviceKey: 'cache.redis',
       providerId: 'azure',
       canonicalName: 'Azure Cache for Redis',
       componentType: 'cache',
-      pricingServiceName: 'Azure Cache for Redis'
+      pricingServiceName: 'Azure Cache for Redis',
+      sourceCategory: 'Databases',
+      mappingStatus: 'mapped'
     });
-    expect(services[0].aliases).toContain('redis');
-    expect(services[0].requiredFields).toEqual(['engine', 'memoryGb', 'tier']);
+    expect(redisCache?.aliases).toContain('redis');
+    expect(redisCache?.requiredFields).toEqual(['engine', 'memoryGb', 'tier']);
+  });
+
+  it('imports the full spreadsheet service catalog for each provider', () => {
+    const catalog = createCatalog();
+
+    expect(catalog.listServices({ provider: 'azure' }).length).toBeGreaterThanOrEqual(138);
+    expect(catalog.listServices({ provider: 'aws' }).length).toBeGreaterThanOrEqual(138);
+    expect(catalog.listServices({ provider: 'gcp' }).length).toBeGreaterThanOrEqual(138);
+
+    expect(catalog.listServices({ provider: 'aws', query: 'Amazon SageMaker' })).toContainEqual(
+      expect.objectContaining({
+        serviceKey: 'ai-machine-learning.azure-machine-learning',
+        sourceCategory: 'AI + Machine Learning',
+        mappingStatus: 'mapped'
+      })
+    );
+  });
+
+  it('keeps no-direct-equivalent mappings visible for review', () => {
+    const catalog = createCatalog();
+    const services = catalog.listServices({ provider: 'aws', query: 'Graph Data Connect' });
+
+    expect(services).toContainEqual(
+      expect.objectContaining({
+        serviceKey: 'analytics.graph-data-connect',
+        canonicalName: 'No direct equivalent',
+        mappingStatus: 'no_direct_equivalent',
+        notes: 'No direct equivalent in the source mapping.'
+      })
+    );
   });
 
   it('maps private cloud networks across Azure, AWS, and GCP', () => {

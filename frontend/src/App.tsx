@@ -1,20 +1,22 @@
 import { useRef, useState } from 'react';
-import { Bot, Calculator, GitCompareArrows } from 'lucide-react';
+import { Bot, Calculator, CloudCog, GitCompareArrows } from 'lucide-react';
 import { AiHelpTab } from './components/AiHelpTab';
 import { CalculateEstimateButton } from './components/CalculateEstimateButton';
 import { ClarifyingQuestionsPanel } from './components/ClarifyingQuestionsPanel';
+import { CompareEstimates } from './components/CompareEstimates';
 import { ErrorAlert } from './components/ErrorAlert';
 import { EstimateSummary } from './components/EstimateSummary';
 import { LoadingState } from './components/LoadingState';
+import { OptionalAddOnsPanel } from './components/OptionalAddOnsPanel';
 import { ProcessRail } from './components/ProcessRail';
-import { ProviderTabs } from './components/ProviderTabs';
+import { ProviderTabs, type ProviderTabKey } from './components/ProviderTabs';
 import { RequirementReview } from './components/RequirementReview';
 import { RequirementTextInput } from './components/RequirementTextInput';
 import { AssumptionsPanel } from './components/AssumptionsPanel';
 import { ServiceMappingTab } from './components/ServiceMappingTab';
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs';
 import { createNaturalLanguageEstimate, extractRequirements, getApiErrorMessage, refineRequirements } from './lib/api';
-import type { NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement } from './types/estimate';
+import type { NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement, Provider } from './types/estimate';
 
 const exampleRequirement = `I need 2 web servers with 4 vCPU and 16GB RAM each, running Linux Ubuntu.
 A managed PostgreSQL database with 8 vCPU and 32GB RAM, 500GB SSD storage.
@@ -55,22 +57,26 @@ function App() {
   const [requirementText, setRequirementText] = useState(exampleRequirement);
   const [requirements, setRequirements] = useState<NormalizedInfrastructureRequirement | null>(null);
   const [extractedPrompt, setExtractedPrompt] = useState<string | null>(null);
-  const [estimate, setEstimate] = useState<NaturalLanguageEstimateResponse | null>(null);
+  const [estimates, setEstimates] = useState<Partial<Record<Provider, NaturalLanguageEstimateResponse>>>({});
   const [loading, setLoading] = useState<'extract' | 'estimate' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('estimate');
+  const [selectedProvider, setSelectedProvider] = useState<ProviderTabKey>('azure');
   const requirementTextRef = useRef(exampleRequirement);
   const extractRequestRef = useRef(0);
 
   const hasCurrentExtraction = Boolean(requirements && extractedPrompt === requirementText);
   const hasEstimablePricing = Boolean(hasCurrentExtraction && requirements?.components.some(isEstimableComponent));
+  const activeProvider = selectedProvider === 'compare' ? 'azure' : selectedProvider;
+  const activeEstimate = selectedProvider === 'compare' ? null : estimates[activeProvider];
+  const hasAnyEstimate = Object.values(estimates).some(Boolean);
 
   function handleRequirementTextChange(value: string) {
     requirementTextRef.current = value;
     setRequirementText(value);
     setRequirements(null);
     setExtractedPrompt(null);
-    setEstimate(null);
+    setEstimates({});
     setError(null);
   }
 
@@ -82,7 +88,7 @@ function App() {
     setError(null);
     setRequirements(null);
     setExtractedPrompt(null);
-    setEstimate(null);
+    setEstimates({});
 
     try {
       const result = await extractRequirements(promptSnapshot);
@@ -112,11 +118,26 @@ function App() {
     setError(null);
 
     try {
-      const result = await createNaturalLanguageEstimate({
-        provider: 'azure',
-        requirements
-      });
-      setEstimate(result);
+      if (selectedProvider === 'compare') {
+        const results = await Promise.all(
+          (['azure', 'aws', 'gcp'] as Provider[]).map((provider) =>
+            createNaturalLanguageEstimate({
+              provider,
+              requirements
+            })
+          )
+        );
+        setEstimates((current) => ({
+          ...current,
+          ...Object.fromEntries(results.map((result) => [result.provider, result]))
+        }));
+      } else {
+        const result = await createNaturalLanguageEstimate({
+          provider: selectedProvider,
+          requirements
+        });
+        setEstimates((current) => ({ ...current, [selectedProvider]: result }));
+      }
     } catch (estimateError) {
       setError(getApiErrorMessage(estimateError));
     } finally {
@@ -130,7 +151,7 @@ function App() {
     setRequirementText(nextRequirementText);
     setExtractedPrompt(nextRequirementText);
     setRequirements((current) => (current ? applyClarification(current, question, clarification) : current));
-    setEstimate(null);
+    setEstimates({});
   }
 
   function handleComponentUpdate(componentId: string, updates: Record<string, unknown>) {
@@ -160,31 +181,69 @@ function App() {
 
       return { ...current, components };
     });
-    setEstimate(null);
+    setEstimates({});
+  }
+
+  function handleOptionalAddOnUpsert(component: NormalizedInfrastructureRequirement['components'][number]) {
+    setRequirements((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const exists = current.components.some((item) => item.id === component.id);
+      return {
+        ...current,
+        components: exists ? current.components.map((item) => (item.id === component.id ? component : item)) : [...current.components, component]
+      };
+    });
+    setEstimates({});
+  }
+
+  function handleOptionalAddOnRemove(componentId: string) {
+    setRequirements((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        components: current.components.filter((component) => component.id !== componentId)
+      };
+    });
+    setEstimates({});
   }
 
   return (
     <main className="min-h-screen bg-mist text-ink">
-      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 px-3 py-3 sm:px-4 lg:px-5">
-        <header className="overflow-hidden rounded-md border border-slate-800 bg-navy px-4 py-3 shadow-command">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="h-0.5 w-10 rounded-full bg-tealSoft" />
-              <h1 className="mt-2 text-xl font-bold text-white">Cloud Cost Calculator</h1>
-              <p className="mt-0.5 max-w-3xl text-xs leading-5 text-slate-300">
-                Compact FinOps workspace for service review, pricing readiness, and multi-cloud mapping.
-              </p>
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
+        <header className="relative overflow-hidden rounded-2xl bg-brand-header px-6 py-6 shadow-command">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-azure/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-teal/15 blur-3xl" />
+          <div className="relative flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-brand-accent shadow-glow">
+                <CloudCog className="h-6 w-6 text-white" aria-hidden="true" />
+              </span>
+              <div>
+                <h1 className="text-2xl font-extrabold tracking-tight text-white">Cloud Cost Calculator</h1>
+                <p className="mt-0.5 max-w-3xl text-sm leading-5 text-slate-300">
+                  FinOps workspace for service review, pricing readiness, and multi-cloud mapping.
+                </p>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md border border-tealSoft/30 bg-tealSoft/10 px-2.5 py-1 text-[11px] font-semibold text-tealSoft">Azure pricing active</span>
-              <span className="rounded-md border border-slate-600 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-200">AWS/GCP mapping</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-tealSoft/30 bg-tealSoft/10 px-3 py-1.5 text-xs font-bold text-tealSoft">
+                <span className="h-1.5 w-1.5 rounded-full bg-tealSoft" />
+                Azure pricing active
+              </span>
+              <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200">AWS/GCP early proposal</span>
             </div>
           </div>
         </header>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_430px]">
-          <ProviderTabs />
-          <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={Boolean(estimate)} />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+          <ProviderTabs selected={selectedProvider} estimates={estimates} onSelect={setSelectedProvider} />
+          <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={hasAnyEstimate} />
         </div>
 
         <Tabs value={workspaceTab} onValueChange={(value) => setWorkspaceTab(value as WorkspaceTab)}>
@@ -192,11 +251,11 @@ function App() {
             {workspaceTabs.map((tab) => {
               const Icon = tab.icon;
               return (
-                <TabsTrigger key={tab.key} value={tab.key} className="justify-start px-3">
+                <TabsTrigger key={tab.key} value={tab.key} className="justify-start px-3.5">
                   <Icon className="h-4 w-4 flex-none" aria-hidden="true" />
                   <span className="min-w-0 text-left">
                     <span className="block truncate">{tab.label}</span>
-                    <span className="block truncate text-[10px] font-medium text-muted">{tab.helper}</span>
+                    <span className="block truncate text-[10px] font-medium text-muted group-data-[state=active]:text-white/80">{tab.helper}</span>
                   </span>
                 </TabsTrigger>
               );
@@ -205,47 +264,71 @@ function App() {
         </Tabs>
 
         {workspaceTab === 'estimate' ? (
-          <div className="grid gap-3 lg:grid-cols-[390px_minmax(0,1fr)]">
+          <div className="grid items-start gap-4 lg:grid-cols-[390px_minmax(0,1fr)]">
             <RequirementTextInput
               value={requirementText}
               loading={loading === 'extract'}
+              provider={activeProvider}
               onChange={handleRequirementTextChange}
               onExtract={handleExtract}
-              onRefine={refineRequirements}
+              onRefine={(value, provider) => refineRequirements(value, { provider })}
             />
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {error ? <ErrorAlert message={error} /> : null}
               {loading ? <LoadingState /> : null}
               {requirements ? (
                 <>
-                  <RequirementReview requirements={requirements} onComponentUpdate={handleComponentUpdate} />
+                  <RequirementReview requirements={requirements} provider={selectedProvider} onComponentUpdate={handleComponentUpdate} />
+                  {selectedProvider === 'azure' ? (
+                    <OptionalAddOnsPanel
+                      components={requirements.components}
+                      onUpsert={handleOptionalAddOnUpsert}
+                      onRemove={handleOptionalAddOnRemove}
+                    />
+                  ) : null}
                   <ClarifyingQuestionsPanel questions={requirements.clarifyingQuestions} onAnswer={handleClarificationAnswer} />
                   <AssumptionsPanel assumptions={requirements.globalAssumptions} />
-                  <CalculateEstimateButton
-                    loading={loading === 'estimate'}
-                    disabled={!hasEstimablePricing}
-                    onClick={handleEstimate}
-                  />
+                  <div className="flex justify-end">
+                    <CalculateEstimateButton
+                      loading={loading === 'estimate'}
+                      disabled={!hasEstimablePricing}
+                      label={selectedProvider === 'compare' ? 'Calculate all providers' : `Calculate ${providerLabel(activeProvider)} cost`}
+                      onClick={handleEstimate}
+                    />
+                  </div>
                 </>
               ) : (
-                <section className="rounded-md border border-dashed border-line bg-panel p-5 text-center shadow-card">
-                  <h2 className="text-base font-semibold text-navy">Start by finding services</h2>
-                  <p className="mt-1 text-xs leading-5 text-muted">
+                <section className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-white/60 p-8 text-center shadow-sm">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-accent shadow-glow">
+                    <Calculator className="h-6 w-6 text-white" aria-hidden="true" />
+                  </span>
+                  <h2 className="mt-4 text-base font-bold text-navy">Start by finding services</h2>
+                  <p className="mt-1.5 max-w-sm text-xs leading-5 text-muted">
                     Paste the requirement on the left, then click Find services. The app will show what can be priced and what needs more information.
                   </p>
                 </section>
               )}
-              {estimate ? <EstimateSummary estimate={estimate} /> : null}
+              {selectedProvider === 'compare' ? <CompareEstimates estimates={estimates} /> : null}
+              {activeEstimate && selectedProvider !== 'compare' ? <EstimateSummary estimate={activeEstimate} /> : null}
             </div>
           </div>
         ) : null}
 
         {workspaceTab === 'mapping' ? <ServiceMappingTab /> : null}
-        {workspaceTab === 'ai' ? <AiHelpTab requirements={requirements} estimate={estimate} /> : null}
+        {workspaceTab === 'ai' ? <AiHelpTab requirements={requirements} estimate={activeEstimate ?? estimates.azure ?? null} /> : null}
       </div>
     </main>
   );
+}
+
+function providerLabel(provider: Provider): string {
+  const labels: Record<Provider, string> = {
+    azure: 'Azure',
+    aws: 'AWS',
+    gcp: 'GCP'
+  };
+  return labels[provider];
 }
 
 export default App;
@@ -257,6 +340,10 @@ function hasReviewValue(value: unknown): boolean {
 function isEstimableComponent(component: NormalizedInfrastructureRequirement['components'][number]): boolean {
   if (component.pricingStatus === 'missing_required_fields' || component.pricingStatus === 'unsupported' || component.pricingStatus === 'needs_review') {
     return false;
+  }
+
+  if (component.optionalAddon && component.missingFields.length === 0) {
+    return true;
   }
 
   if (component.type === 'compute') {

@@ -261,7 +261,7 @@ Do not ignore services just because pricing is not implemented.
 Use provider-neutral infrastructure components.
 Use one universal extraction pass for every service in the prompt.
 Convert TB to GB using 1 TB = 1024 GB.
-Normalize common region names to provider regions. If the user says US East, East US, us east, or east us, map provider regions to Azure eastus, AWS us-east-1, and GCP us-east1.
+Normalize common region names to provider regions. If the user says US East, East US, us east, east us, us-east, us_east, useast, or eastus, map provider regions to Azure eastus, AWS us-east-1, and GCP us-east1.
 If the user says "highly available", "high availability", "HA", "zone redundant", "zone-redundant", "multi-zone", "replicated", or "production database", set database.highAvailability = true unless the user explicitly says no HA.
 If the user says "production grade Redis", "production Redis", "standard Redis", "premium Redis", "replicated Redis", or "highly available Redis", set cache.tier = "production".
 If the user says "basic Redis", "dev Redis", "development Redis", or "non-production Redis", set cache.tier = "basic".

@@ -19,59 +19,59 @@ export function AiHelpTab({ requirements, estimate }: AiHelpTabProps) {
   const answer = useMemo(() => answerQuestion(question, requirements, estimate), [question, requirements, estimate]);
 
   return (
-    <section className="rounded-md border border-line bg-white shadow-card">
-      <div className="border-b border-line bg-slate-50 px-4 py-3">
+    <section className="rounded-xl border border-line bg-white shadow-card">
+      <div className="border-b border-lineSoft bg-slate-50/60 px-5 py-4">
         <div className="dashboard-kicker text-violet">
           <Bot className="h-3.5 w-3.5" aria-hidden="true" />
           AI help preview
         </div>
-        <h2 className="mt-2 text-base font-semibold text-navy">Ask about the estimate</h2>
+        <h2 className="mt-2.5 text-base font-bold text-navy">Ask about the estimate</h2>
         <p className="mt-0.5 max-w-3xl text-xs leading-5 text-muted">
           This first version gives safe answers from the current review and estimate. Full AI chat can be connected later. It will not invent prices.
         </p>
       </div>
 
-      <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="rounded-md border border-line bg-slate-50 p-3">
+      <div className="grid gap-3.5 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="rounded-xl border border-line bg-slate-50 p-3.5">
           <label className="block">
             <span className="text-xs font-semibold uppercase text-graphite">Question</span>
             <textarea
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               rows={3}
-              className="mt-1.5 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs leading-5 text-ink outline-none transition focus:border-violet focus:ring-4 focus:ring-violet/15"
+              className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs leading-5 text-ink outline-none transition focus:border-violet focus:ring-4 focus:ring-violet/15"
             />
           </label>
           <button
             type="button"
             onClick={() => setQuestion(question.trim() || sampleQuestions[0])}
-            className="mt-2 inline-flex h-9 items-center gap-2 rounded-md bg-violet px-3 text-xs font-semibold text-white transition hover:bg-plum"
+            className="mt-2.5 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-violet px-3.5 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
           >
             <SendHorizonal className="h-4 w-4" aria-hidden="true" />
             Draft answer
           </button>
 
-          <div className="mt-3 rounded-md border border-violet/20 bg-white p-3">
-            <h3 className="text-xs font-semibold uppercase text-navy">Answer</h3>
+          <div className="mt-3 rounded-lg border border-violet/20 bg-white p-3.5">
+            <h3 className="text-xs font-bold uppercase text-navy">Answer</h3>
             <p className="mt-1.5 whitespace-pre-line text-xs leading-5 text-slate-700">{answer}</p>
           </div>
         </div>
 
-        <aside className="rounded-md border border-line bg-white p-3">
-          <h3 className="text-xs font-semibold uppercase text-navy">Quick questions</h3>
+        <aside className="rounded-xl border border-line bg-white p-3.5">
+          <h3 className="text-xs font-bold uppercase text-navy">Quick questions</h3>
           <div className="mt-2 grid gap-1.5">
             {sampleQuestions.map((sample) => (
               <button
                 key={sample}
                 type="button"
                 onClick={() => setQuestion(sample)}
-                className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left text-[11px] font-semibold leading-4 text-graphite transition hover:border-violet/30 hover:bg-violet/5 hover:text-violet"
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left text-[11px] font-semibold leading-4 text-graphite transition hover:border-violet/30 hover:bg-violet/5 hover:text-violet"
               >
                 {sample}
               </button>
             ))}
           </div>
-          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-4 text-amber-950">
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-4 text-amber-950">
             Future AI chat should use requirements, mapping, estimate lines, assumptions, and documentation. It should never create a price that is not calculated.
           </div>
         </aside>

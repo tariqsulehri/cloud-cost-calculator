@@ -201,7 +201,11 @@ export class ServiceMappingService {
 
   private normalizeRegion(requirement: NormalizedInfrastructureRequirement): NormalizedInfrastructureRequirement['region'] {
     const raw = `${requirement.region.raw ?? ''} ${requirement.region.normalized ?? ''}`.toLowerCase();
-    if (/\b(us east|east us|us-east-1|eastus)\b/.test(raw)) {
+    const normalized = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (
+      /\b(us east|east us|us east 1|us east1)\b/.test(normalized) ||
+      /(^|[^a-z0-9])(eastus|useast)([^a-z0-9]|$)/.test(raw)
+    ) {
       return {
         raw: requirement.region.raw,
         normalized: 'eastus',

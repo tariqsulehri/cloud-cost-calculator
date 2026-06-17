@@ -95,6 +95,21 @@ They will run 730 hours per month.`
     expect(compute.missingFields).toEqual([]);
   });
 
+  it('normalizes common East US aliases during extraction', () => {
+    for (const region of ['useast', 'us-east', 'us_east', 'eastus']) {
+      const result = service.extractRequirements(`I need 2 Linux Ubuntu virtual machines in ${region}.
+Each VM should have 2 vCPU and 8 GB RAM.
+They run 730 hours per month.`);
+
+      expect(result.region).toMatchObject({
+        normalized: 'eastus',
+        providerRegion: { azure: 'eastus', aws: 'us-east-1', gcp: 'us-east1' },
+        confidence: 'high'
+      });
+      expect(result.region.raw).toBeTruthy();
+    }
+  });
+
   it('ignores open-item checklist questions while keeping answered clarifications', () => {
     const result = service.extractRequirements(`Azure Cost Estimation Request:
 

@@ -4,19 +4,19 @@ import type * as React from 'react';
 import { cn } from '../../lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure/30 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-xs font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure/30 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        default: 'bg-azure text-white shadow-glow hover:bg-azureDark',
-        secondary: 'border border-line bg-white text-graphite hover:bg-slate-50',
+        default: 'bg-brand-accent text-white shadow-glow hover:brightness-110',
+        secondary: 'border border-line bg-white text-graphite hover:border-azure/30 hover:bg-blue-50/60 hover:text-azure',
         ghost: 'text-graphite hover:bg-slate-100',
         destructive: 'bg-danger text-white hover:bg-red-700'
       },
       size: {
         sm: 'h-8 px-2.5',
-        md: 'h-9 px-3',
-        lg: 'h-10 px-4',
+        md: 'h-9 px-3.5',
+        lg: 'h-11 px-5',
         icon: 'h-8 w-8'
       }
     },

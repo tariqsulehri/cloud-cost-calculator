@@ -1,4 +1,5 @@
 import { AzurePricingService } from './AzurePricingService.js';
+import { PreliminaryCloudPricingService } from './PreliminaryCloudPricingService.js';
 import { roundMoney } from '../utils/money.js';
 import type {
   EstimateLineItem,
@@ -13,7 +14,10 @@ import type {
 } from '../types/estimate.types.js';
 
 export class EstimateService {
-  constructor(private readonly azurePricingService = new AzurePricingService()) {}
+  constructor(
+    private readonly azurePricingService = new AzurePricingService(),
+    private readonly preliminaryCloudPricingService = new PreliminaryCloudPricingService()
+  ) {}
 
   async estimate(request: EstimateRequest): Promise<EstimateResponse> {
     const vmPrice = await this.azurePricingService.getVirtualMachineHourlyPrice({
@@ -62,6 +66,10 @@ export class EstimateService {
   }
 
   async estimateNormalized(request: NormalizedEstimateRequest): Promise<NormalizedEstimateResponse> {
+    if (request.provider !== 'azure') {
+      return this.preliminaryCloudPricingService.estimateNormalized(request);
+    }
+
     const region = request.requirements.region.providerRegion.azure;
     const calculatedLineItems: EstimateLineItem[] = [];
     const notImplementedLineItems: NotImplementedLineItem[] = [];
@@ -89,7 +97,17 @@ export class EstimateService {
     });
 
     for (const component of components) {
-      if (component.type === 'compute') {
+      const optionalAddOnResult = this.priceAzureOptionalAddOn(component as unknown as GenericComponent);
+      if (optionalAddOnResult) {
+        if (component.pricingStatus === 'missing_required_fields' || component.missingFields.length > 0) {
+          missingRequiredFieldLineItems.push(this.toUnpricedLineItem(component, `Missing ${component.missingFields.join(', ')} required for optional add-on pricing.`));
+          continue;
+        }
+
+        calculatedLineItems.push(...optionalAddOnResult.lineItems);
+        pricedComponentIds.add(component.id);
+        assumptions.push(optionalAddOnResult.assumption);
+      } else if (component.type === 'compute') {
         if (component.pricingStatus === 'missing_required_fields' || !component.vcpu || !component.memoryGb) {
           missingRequiredFieldLineItems.push(this.toUnpricedLineItem(component, 'Missing compute sizing required for deterministic VM pricing.'));
           continue;
@@ -810,6 +828,359 @@ export class EstimateService {
     }
 
     return null;
+  }
+
+  private priceAzureOptionalAddOn(component: GenericComponent): { lineItems: EstimateLineItem[]; assumption: string } | null {
+    const addOn = this.stringValue(component, 'optionalAddon');
+    if (!addOn) {
+      return null;
+    }
+
+    const line = (input: {
+      category: EstimateLineItem['category'];
+      serviceName: string;
+      skuName: string;
+      meterName: string;
+      quantity: number;
+      unit: string;
+      unitPrice: number;
+      usageLabel?: string;
+      assumption: string;
+    }): EstimateLineItem => ({
+      category: input.category,
+      serviceName: input.serviceName,
+      skuName: input.skuName,
+      meterName: input.meterName,
+      quantity: input.quantity,
+      hours: 1,
+      usageLabel: input.usageLabel,
+      unit: input.unit,
+      unitPrice: input.unitPrice,
+      monthlyCost: roundMoney(input.quantity * input.unitPrice),
+      assumption: input.assumption,
+      pricingSource: 'early-proposal-rate-card',
+      confidence: 'low',
+      rawProductName: null,
+      rawSkuName: null,
+      rawMeterName: null,
+      rawArmRegionName: null
+    });
+    const assumption =
+      'Optional Azure add-on uses an early proposal planning rate. Validate with Azure Calculator or exact Azure Retail Prices API meters before final client quote.';
+
+    switch (addOn) {
+      case 'managed-disks': {
+        const diskCount = this.numberValue(component, 'diskCount') ?? 0;
+        const diskSizeGb = this.numberValue(component, 'diskSizeGb') ?? 0;
+        const diskTier = this.stringValue(component, 'diskTier') ?? 'standard-ssd';
+        const unitPrice = diskTier.toLowerCase().includes('premium') ? 0.16 : diskTier.toLowerCase().includes('ultra') ? 0.22 : 0.08;
+        return {
+          assumption,
+          lineItems: [
+            line({
+              category: 'Storage',
+              serviceName: 'Azure Managed Disks',
+              skuName: diskTier,
+              meterName: 'Planning GB-month',
+              quantity: diskCount * diskSizeGb,
+              usageLabel: `${diskCount} disk(s) x ${diskSizeGb} GB`,
+              unit: '1 GB/Month',
+              unitPrice,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'nat-gateway': {
+        const gatewayCount = this.numberValue(component, 'gatewayCount') ?? 0;
+        const processedGb = this.numberValue(component, 'monthlyDataProcessedGb') ?? 0;
+        return {
+          assumption,
+          lineItems: [
+            this.hourlyOptionalLine('Azure NAT Gateway', 'Gateway hour planning rate', gatewayCount, 0.045, assumption),
+            line({
+              category: 'Networking',
+              serviceName: 'Azure NAT Gateway',
+              skuName: 'Data processed planning rate',
+              meterName: 'Processed data',
+              quantity: processedGb,
+              usageLabel: `${this.formatUsage(processedGb)} GB processed`,
+              unit: '1 GB',
+              unitPrice: 0.045,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'public-ip':
+        return {
+          assumption,
+          lineItems: [this.hourlyOptionalLine('Azure Public IP Address', this.stringValue(component, 'ipSku') ?? 'standard', this.numberValue(component, 'publicIpCount') ?? 0, 0.005, assumption)]
+        };
+      case 'private-endpoint': {
+        const endpointCount = this.numberValue(component, 'endpointCount') ?? 0;
+        const processedGb = this.numberValue(component, 'monthlyDataProcessedGb') ?? 0;
+        return {
+          assumption,
+          lineItems: [
+            this.hourlyOptionalLine('Azure Private Endpoint', 'Endpoint hour planning rate', endpointCount, 0.01, assumption, 730, 'Networking'),
+            line({
+              category: 'Networking',
+              serviceName: 'Azure Private Endpoint',
+              skuName: 'Data processed planning rate',
+              meterName: 'Processed data',
+              quantity: processedGb,
+              usageLabel: `${this.formatUsage(processedGb)} GB processed`,
+              unit: '1 GB',
+              unitPrice: 0.01,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'dns': {
+        const zones = this.numberValue(component, 'dnsZoneCount') ?? 0;
+        const queryMillions = this.numberValue(component, 'dnsQueriesMillion') ?? 0;
+        return {
+          assumption,
+          lineItems: [
+            line({
+              category: 'Networking',
+              serviceName: 'Azure DNS',
+              skuName: 'Hosted zone planning rate',
+              meterName: 'Hosted zone',
+              quantity: zones,
+              unit: '1 Zone/Month',
+              unitPrice: 0.5,
+              assumption
+            }),
+            line({
+              category: 'Networking',
+              serviceName: 'Azure DNS',
+              skuName: 'Query planning rate',
+              meterName: 'DNS queries',
+              quantity: queryMillions,
+              usageLabel: `${this.formatUsage(queryMillions)}M queries`,
+              unit: '1M Queries',
+              unitPrice: 0.4,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'key-vault': {
+        const operations = this.numberValue(component, 'operationsCount') ?? 0;
+        return {
+          assumption,
+          lineItems: [
+            line({
+              category: 'Management',
+              serviceName: 'Azure Key Vault',
+              skuName: 'Operations planning rate',
+              meterName: 'Operations',
+              quantity: operations / 10_000,
+              usageLabel: `${this.formatUsage(operations)} operations`,
+              unit: '10K Operations',
+              unitPrice: 0.03,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'azure-firewall': {
+        const firewallCount = this.numberValue(component, 'firewallCount') ?? 0;
+        const tier = this.stringValue(component, 'firewallTier') ?? 'standard';
+        const processedGb = this.numberValue(component, 'monthlyDataProcessedGb') ?? 0;
+        const hourlyRate = tier.toLowerCase().includes('premium') ? 1.75 : tier.toLowerCase().includes('basic') ? 0.395 : 1.25;
+        return {
+          assumption,
+          lineItems: [
+            this.hourlyOptionalLine('Azure Firewall', `${tier} deployment planning rate`, firewallCount, hourlyRate, assumption),
+            line({
+              category: 'Networking',
+              serviceName: 'Azure Firewall',
+              skuName: `${tier} data processing planning rate`,
+              meterName: 'Processed data',
+              quantity: processedGb,
+              usageLabel: `${this.formatUsage(processedGb)} GB processed`,
+              unit: '1 GB',
+              unitPrice: 0.016,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'app-service':
+        return {
+          assumption,
+          lineItems: [
+            this.hourlyOptionalLine(
+              'Azure App Service',
+              this.stringValue(component, 'planTier') ?? 'standard',
+              this.numberValue(component, 'instanceCount') ?? 0,
+              this.planHourlyRate(this.stringValue(component, 'planTier') ?? 'standard'),
+              assumption,
+              this.numberValue(component, 'monthlyHours') ?? 730
+            )
+          ]
+        };
+      case 'sql-database': {
+        const vcpu = this.numberValue(component, 'vcpu') ?? 0;
+        const storageGb = this.numberValue(component, 'storageGb') ?? 0;
+        const computeQuantity = component.highAvailability === true ? 2 : 1;
+        return {
+          assumption,
+          lineItems: [
+            this.hourlyOptionalLine('Azure SQL Database', 'vCore planning rate', computeQuantity, vcpu * 0.25, assumption, 730, 'Database'),
+            line({
+              category: 'Database',
+              serviceName: 'Azure SQL Database',
+              skuName: 'Storage planning rate',
+              meterName: 'Storage',
+              quantity: storageGb,
+              usageLabel: `${this.formatUsage(storageGb)} GB-month`,
+              unit: '1 GB/Month',
+              unitPrice: 0.12,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'backup': {
+        const protectedDataGb = this.numberValue(component, 'protectedDataGb') ?? 0;
+        return {
+          assumption,
+          lineItems: [
+            line({
+              category: 'Management',
+              serviceName: 'Azure Backup',
+              skuName: 'Protected data planning rate',
+              meterName: 'Protected data',
+              quantity: protectedDataGb,
+              usageLabel: `${this.formatUsage(protectedDataGb)} GB protected`,
+              unit: '1 GB/Month',
+              unitPrice: 0.025,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'front-door': {
+        const transferGb = this.numberValue(component, 'dataTransferGb') ?? 0;
+        const requestMillions = (this.numberValue(component, 'requestCount') ?? 0) / 1_000_000;
+        return {
+          assumption,
+          lineItems: [
+            line({
+              category: 'Networking',
+              serviceName: 'Azure Front Door',
+              skuName: 'Data transfer planning rate',
+              meterName: 'Data transfer',
+              quantity: transferGb,
+              usageLabel: `${this.formatUsage(transferGb)} GB transfer`,
+              unit: '1 GB',
+              unitPrice: 0.08,
+              assumption
+            }),
+            line({
+              category: 'Networking',
+              serviceName: 'Azure Front Door',
+              skuName: 'Requests planning rate',
+              meterName: 'Requests',
+              quantity: requestMillions,
+              usageLabel: `${this.formatUsage(requestMillions)}M requests`,
+              unit: '1M Requests',
+              unitPrice: 0.6,
+              assumption
+            })
+          ]
+        };
+      }
+      case 'container-apps': {
+        const vcpuSeconds = this.numberValue(component, 'vcpuSeconds') ?? 0;
+        const memoryGbSeconds = this.numberValue(component, 'memoryGbSeconds') ?? 0;
+        const requestMillions = (this.numberValue(component, 'requestCount') ?? 0) / 1_000_000;
+        return {
+          assumption,
+          lineItems: [
+            line({
+              category: 'Compute',
+              serviceName: 'Azure Container Apps',
+              skuName: 'vCPU planning rate',
+              meterName: 'vCPU seconds',
+              quantity: vcpuSeconds,
+              unit: '1 vCPU-second',
+              unitPrice: 0.000024,
+              assumption
+            }),
+            line({
+              category: 'Compute',
+              serviceName: 'Azure Container Apps',
+              skuName: 'Memory planning rate',
+              meterName: 'Memory seconds',
+              quantity: memoryGbSeconds,
+              unit: '1 GB-second',
+              unitPrice: 0.000003,
+              assumption
+            }),
+            line({
+              category: 'Compute',
+              serviceName: 'Azure Container Apps',
+              skuName: 'Requests planning rate',
+              meterName: 'Requests',
+              quantity: requestMillions,
+              usageLabel: `${this.formatUsage(requestMillions)}M requests`,
+              unit: '1M Requests',
+              unitPrice: 0.4,
+              assumption
+            })
+          ]
+        };
+      }
+      default:
+        return null;
+    }
+  }
+
+  private hourlyOptionalLine(
+    serviceName: string,
+    skuName: string,
+    quantity: number,
+    hourlyRate: number,
+    assumption: string,
+    hours = 730,
+    category?: EstimateLineItem['category']
+  ): EstimateLineItem {
+    return {
+      category: category ?? (serviceName.includes('Firewall') || serviceName.includes('NAT') || serviceName.includes('IP') ? 'Networking' : 'Compute'),
+      serviceName,
+      skuName,
+      meterName: 'Planning hourly rate',
+      quantity,
+      hours,
+      usageLabel: `${quantity} x ${hours} hours`,
+      unit: '1 Hour',
+      unitPrice: hourlyRate,
+      monthlyCost: roundMoney(quantity * hours * hourlyRate),
+      assumption,
+      pricingSource: 'early-proposal-rate-card',
+      confidence: 'low',
+      rawProductName: null,
+      rawSkuName: null,
+      rawMeterName: null,
+      rawArmRegionName: null
+    };
+  }
+
+  private planHourlyRate(tier: string): number {
+    const normalized = tier.toLowerCase();
+    if (normalized.includes('premium')) {
+      return 0.2;
+    }
+    if (normalized.includes('basic')) {
+      return 0.075;
+    }
+    return 0.1;
   }
 
   private numberValue(component: GenericComponent, field: string): number | null {

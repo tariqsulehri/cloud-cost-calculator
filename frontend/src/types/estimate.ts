@@ -1,4 +1,4 @@
-export type Provider = 'azure';
+export type Provider = 'azure' | 'aws' | 'gcp';
 export type AzureService = 'virtual-machines';
 export type OperatingSystem = 'linux';
 export type ImageType = 'ubuntu';
@@ -6,7 +6,7 @@ export type Tier = 'standard';
 export type Category = 'all';
 export type PricingModel = 'pay-as-you-go';
 export type Confidence = 'low' | 'medium' | 'high';
-export type PricingSource = 'azure-retail-prices-api' | 'fallback';
+export type PricingSource = 'azure-retail-prices-api' | 'early-proposal-rate-card' | 'fallback';
 export type ExtractionMethod = 'llm' | 'rule-based-fallback';
 export type PricingStatus = 'supported' | 'not_implemented' | 'missing_required_fields' | 'unsupported' | 'needs_review';
 
@@ -191,6 +191,9 @@ export interface CatalogService {
   pricingServiceName: string | null;
   serviceFamily: string | null;
   defaultPricingStatus: string;
+  sourceCategory: string | null;
+  mappingStatus: 'mapped' | 'no_direct_equivalent' | 'manual_review';
+  notes: string | null;
   aliases: string[];
   requiredFields: string[];
 }

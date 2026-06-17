@@ -7,6 +7,7 @@ import type {
   NaturalLanguageEstimateResponse,
   NormalizedEstimateRequest,
   NormalizedInfrastructureRequirement,
+  Provider,
   VmOptions
 } from '../types/estimate';
 
@@ -35,8 +36,8 @@ export async function extractRequirements(requirementText: string): Promise<Norm
   return response.data;
 }
 
-export async function refineRequirements(requirementText: string): Promise<string> {
-  const response = await api.post<{ refinedPrompt: string }>('/requirements/refine', { requirementText });
+export async function refineRequirements(requirementText: string, options: { provider?: Provider } = {}): Promise<string> {
+  const response = await api.post<{ refinedPrompt: string }>('/requirements/refine', { requirementText, provider: options.provider });
   return response.data.refinedPrompt;
 }
 

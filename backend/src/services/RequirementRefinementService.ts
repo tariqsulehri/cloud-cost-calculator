@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import type { Provider } from '../types/estimate.types.js';
 
 interface OpenAIResponsesClient {
   responses: {
@@ -6,18 +7,22 @@ interface OpenAIResponsesClient {
   };
 }
 
-const refinePrompt = `Act as a senior Azure cloud architect and FinOps reviewer.
-Refine the user's cloud infrastructure requirement into a clear structured Azure cost-estimation prompt.
+function refinePrompt(provider: Provider): string {
+  const profile = providerProfile(provider);
+  return `Act as a senior ${profile.label} cloud architect and FinOps reviewer.
+Refine the user's cloud infrastructure requirement into a clear structured ${profile.label} cost-estimation prompt.
 Do not calculate prices.
 Do not add services, quantities, tiers, regions, discounts, or assumptions that the user did not provide.
 Preserve every service and specification the user mentioned, including compute, Kubernetes, databases, cache, storage, CDN, load balancing, networking, messaging, monitoring, logging, backup, security, data transfer, request counts, runtime hours, retention, availability, redundancy, operating system, pricing model, and discounts.
-Translate written/generic services into the proper Azure service dictionary, for example Kubernetes -> Azure Kubernetes Service (AKS), virtual machines -> Azure Virtual Machines, managed PostgreSQL -> Azure Database for PostgreSQL Flexible Server, Redis -> Azure Cache for Redis, object storage -> Azure Blob Storage, HTTP/S load balancer or ingress -> Azure Application Gateway, message queue/event bus -> Azure Service Bus, monitoring/logging -> Azure Monitor / Log Analytics.
+Translate written/generic services into the proper ${profile.label} service dictionary, for example Kubernetes -> ${profile.services.kubernetes}, virtual machines -> ${profile.services.compute}, managed PostgreSQL -> ${profile.services.postgres}, Redis -> ${profile.services.redis}, object storage -> ${profile.services.storage}, HTTP/S load balancer or ingress -> ${profile.services.loadBalancer}, message queue/event bus -> ${profile.services.queue}, monitoring/logging -> ${profile.services.monitoring}.
 Normalize common units only when unambiguous, for example 1 TB = 1024 GB if writing storage in GB, or keep TB when that is clearer.
+Normalize common East US aliases when unambiguous, for example useast, us-east, us_east, US East, East US, and eastus -> ${profile.eastUsLabel}.
 Group requirements under concise headings by service area.
 If a value is missing, keep the service and write "not specified" for that field instead of inventing a value.
 Add an "Open items to complete before estimate" section when important pricing fields are missing, using short editable bullets.
 If the user pasted sections named "Prompt:" and "Result:", refine only the actual prompt and ignore the pasted result.
 Return only the refined prompt text.`;
+}
 
 export class RequirementRefinementService {
   private readonly client?: OpenAIResponsesClient;
@@ -36,24 +41,24 @@ export class RequirementRefinementService {
         : undefined);
   }
 
-  async refineRequirements(requirementText: string): Promise<string> {
+  async refineRequirements(requirementText: string, provider: Provider = 'azure'): Promise<string> {
     const intentText = this.promptIntentText(requirementText);
     if (!this.client) {
-      return refineAzurePromptLocally(intentText);
+      return refinePromptLocally(intentText, provider);
     }
 
     try {
       const response = await this.client.responses.create({
         model: this.model,
         input: [
-          { role: 'system', content: refinePrompt },
+          { role: 'system', content: refinePrompt(provider) },
           { role: 'user', content: intentText }
         ]
       });
 
-      return response.output_text?.trim() || refineAzurePromptLocally(intentText);
+      return response.output_text?.trim() || refinePromptLocally(intentText, provider);
     } catch {
-      return refineAzurePromptLocally(intentText);
+      return refinePromptLocally(intentText, provider);
     }
   }
 
@@ -71,15 +76,16 @@ export class RequirementRefinementService {
   }
 }
 
-function refineAzurePromptLocally(input: string): string {
+function refinePromptLocally(input: string, provider: Provider): string {
   const text = input.toLowerCase().replace(/\s+/g, ' ').trim();
   const sections: string[] = [];
-  const mappings = azureMappings(text);
+  const profile = providerProfile(provider);
+  const mappings = serviceMappings(text, provider);
   const openItems = openItemsFor(text);
-  const region = /\b(east us|us east|eastus)\b/i.test(input) ? 'Azure East US' : 'Azure region not specified';
+  const region = regionLabelFromText(input, provider) ?? `${profile.label} region not specified`;
 
   if (mappings.length > 0) {
-    sections.push(`Azure Service Dictionary:\n${mappings.map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`${profile.label} Service Dictionary:\n${mappings.map((line) => `- ${line}`).join('\n')}`);
   }
 
   if (/(kubernetes|aks|worker nodes?)/i.test(text)) {
@@ -89,7 +95,7 @@ function refineAzurePromptLocally(input: string): string {
     const hours = monthlyHours(text);
     sections.push(
       `Kubernetes:\n${[
-        'Azure service: Azure Kubernetes Service (AKS)',
+        `${profile.label} service: ${profile.services.kubernetes}`,
         nodeCount ? `Worker nodes: ${nodeCount}` : 'Worker nodes: not specified',
         vcpu ? `vCPU per node: ${vcpu}` : 'vCPU per node: not specified',
         memoryGb ? `Memory per node: ${memoryGb} GB` : 'Memory per node: not specified',
@@ -109,7 +115,7 @@ function refineAzurePromptLocally(input: string): string {
     const hours = monthlyHours(text);
     sections.push(
       `Compute:\n${[
-        'Azure service: Azure Virtual Machines',
+        `${profile.label} service: ${profile.services.compute}`,
         quantity ? `Virtual machines: ${quantity}` : 'Virtual machines: not specified',
         vcpu ? `vCPU per VM: ${vcpu}` : 'vCPU per VM: not specified',
         memoryGb ? `Memory per VM: ${memoryGb} GB` : 'Memory per VM: not specified',
@@ -123,38 +129,37 @@ function refineAzurePromptLocally(input: string): string {
   }
 
   if (/(postgres|postgresql|database)/i.test(text)) {
-    sections.push(`Database:\n${['Azure service: Azure Database for PostgreSQL Flexible Server', /managed/.test(text) ? 'Deployment: managed' : 'Deployment: not specified']
+    sections.push(`Database:\n${[`${profile.label} service: ${profile.services.postgres}`, /managed/.test(text) ? 'Deployment: managed' : 'Deployment: not specified']
       .map((line) => `- ${line}`)
       .join('\n')}`);
   }
 
   if (/(redis|cache)/i.test(text)) {
-    sections.push(`Cache:\n${['Azure service: Azure Cache for Redis', /redis/.test(text) ? 'Engine: Redis' : 'Engine: not specified'].map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`Cache:\n${[`${profile.label} service: ${profile.services.redis}`, /redis/.test(text) ? 'Engine: Redis' : 'Engine: not specified'].map((line) => `- ${line}`).join('\n')}`);
   }
 
   if (/(object storage|product images|invoices|exported reports)/i.test(text)) {
-    sections.push(`Object Storage:\n${['Azure service: Azure Blob Storage'].map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`Object Storage:\n${[`${profile.label} service: ${profile.services.storage}`].map((line) => `- ${line}`).join('\n')}`);
   }
 
   if (/(cdn|static assets)/i.test(text)) {
-    sections.push(`CDN:\n${['Azure service: Azure CDN / Azure Front Door'].map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`CDN:\n${[`${profile.label} service: ${profile.services.cdn}`].map((line) => `- ${line}`).join('\n')}`);
   }
 
   if (/(load balancer|ingress)/i.test(text)) {
-    const azureService = /\b(http\/s|https|http|layer 7|l7|ingress)\b/i.test(text) ? 'Azure Application Gateway' : 'Azure Load Balancer';
-    sections.push(`Load Balancer / Ingress:\n${[`Azure service: ${azureService}`].map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`Load Balancer / Ingress:\n${[`${profile.label} service: ${profile.services.loadBalancer}`].map((line) => `- ${line}`).join('\n')}`);
   }
 
   if (/(message queue|event bus|asynchronous events|messages)/i.test(text)) {
-    sections.push(`Messaging:\n${['Azure service: Azure Service Bus'].map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`Messaging:\n${[`${profile.label} service: ${profile.services.queue}`].map((line) => `- ${line}`).join('\n')}`);
   }
 
   if (/(monitoring|logging|log ingestion|logs)/i.test(text)) {
-    sections.push(`Monitoring and Logging:\n${['Azure service: Azure Monitor / Log Analytics'].map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`Monitoring and Logging:\n${[`${profile.label} service: ${profile.services.monitoring}`].map((line) => `- ${line}`).join('\n')}`);
   }
 
   if (/\bbackup\b/i.test(text)) {
-    sections.push(`Backup:\n${['Azure service: Azure Backup'].map((line) => `- ${line}`).join('\n')}`);
+    sections.push(`Backup:\n${[`${profile.label} service: ${profile.services.backup}`].map((line) => `- ${line}`).join('\n')}`);
   }
 
   if (openItems.length > 0) {
@@ -164,18 +169,88 @@ function refineAzurePromptLocally(input: string): string {
   return sections.length > 0 ? [`I need infrastructure in ${region}.`, ...sections].join('\n\n') : input.trim();
 }
 
-function azureMappings(text: string): string[] {
+function regionLabelFromText(input: string, provider: Provider): string | null {
+  const raw = input.toLowerCase();
+  const normalized = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (
+    /\b(east us|us east|us east 1|us east1)\b/.test(normalized) ||
+    /(^|[^a-z0-9])(eastus|useast)([^a-z0-9]|$)/.test(raw)
+  ) {
+    return providerProfile(provider).eastUsLabel;
+  }
+
+  return null;
+}
+
+function providerProfile(provider: Provider): { label: string; eastUsLabel: string; services: Record<string, string> } {
+  const profiles: Record<Provider, { label: string; eastUsLabel: string; services: Record<string, string> }> = {
+    azure: {
+      label: 'Azure',
+      eastUsLabel: 'Azure East US',
+      services: {
+        kubernetes: 'Azure Kubernetes Service (AKS)',
+        compute: 'Azure Virtual Machines',
+        postgres: 'Azure Database for PostgreSQL Flexible Server',
+        redis: 'Azure Cache for Redis',
+        storage: 'Azure Blob Storage',
+        cdn: 'Azure CDN / Azure Front Door',
+        loadBalancer: 'Azure Application Gateway',
+        queue: 'Azure Service Bus',
+        monitoring: 'Azure Monitor / Log Analytics',
+        backup: 'Azure Backup'
+      }
+    },
+    aws: {
+      label: 'AWS',
+      eastUsLabel: 'AWS US East (N. Virginia)',
+      services: {
+        kubernetes: 'Amazon EKS',
+        compute: 'Amazon EC2',
+        postgres: 'Amazon RDS for PostgreSQL',
+        redis: 'Amazon ElastiCache for Redis',
+        storage: 'Amazon S3',
+        cdn: 'Amazon CloudFront',
+        loadBalancer: 'Application Load Balancer',
+        queue: 'Amazon SQS / EventBridge',
+        monitoring: 'Amazon CloudWatch',
+        backup: 'AWS Backup'
+      }
+    },
+    gcp: {
+      label: 'GCP',
+      eastUsLabel: 'GCP us-east1',
+      services: {
+        kubernetes: 'Google Kubernetes Engine (GKE)',
+        compute: 'Compute Engine',
+        postgres: 'Cloud SQL for PostgreSQL',
+        redis: 'Memorystore for Redis',
+        storage: 'Cloud Storage',
+        cdn: 'Cloud CDN',
+        loadBalancer: 'Cloud Load Balancing',
+        queue: 'Pub/Sub',
+        monitoring: 'Cloud Monitoring / Cloud Logging',
+        backup: 'Backup and DR Service'
+      }
+    }
+  };
+
+  return profiles[provider];
+}
+
+function serviceMappings(text: string, provider: Provider): string[] {
   const mappings: string[] = [];
-  if (/(kubernetes|aks|worker nodes?)/i.test(text)) mappings.push('Kubernetes -> Azure Kubernetes Service (AKS)');
-  if (/(web server|server|vm|virtual machine)/i.test(text)) mappings.push('VMs / servers -> Azure Virtual Machines');
-  if (/(postgres|postgresql|database)/i.test(text)) mappings.push('Managed PostgreSQL -> Azure Database for PostgreSQL Flexible Server');
-  if (/(redis|cache)/i.test(text)) mappings.push('Redis cache -> Azure Cache for Redis');
-  if (/(object storage|product images|invoices|exported reports)/i.test(text)) mappings.push('Object storage -> Azure Blob Storage');
-  if (/(cdn|static assets)/i.test(text)) mappings.push('CDN/static assets -> Azure CDN / Azure Front Door');
-  if (/(load balancer|ingress)/i.test(text)) mappings.push('HTTP/S load balancer or ingress -> Azure Application Gateway');
-  if (/(message queue|event bus|asynchronous events|messages)/i.test(text)) mappings.push('Message queue/event bus -> Azure Service Bus');
-  if (/(monitoring|logging|log ingestion|logs)/i.test(text)) mappings.push('Monitoring/logging -> Azure Monitor / Log Analytics');
-  if (/\bbackup\b/i.test(text)) mappings.push('Backup -> Azure Backup');
+  const services = providerProfile(provider).services;
+  if (/(kubernetes|aks|worker nodes?)/i.test(text)) mappings.push(`Kubernetes -> ${services.kubernetes}`);
+  if (/(web server|server|vm|virtual machine)/i.test(text)) mappings.push(`VMs / servers -> ${services.compute}`);
+  if (/(postgres|postgresql|database)/i.test(text)) mappings.push(`Managed PostgreSQL -> ${services.postgres}`);
+  if (/(redis|cache)/i.test(text)) mappings.push(`Redis cache -> ${services.redis}`);
+  if (/(object storage|product images|invoices|exported reports)/i.test(text)) mappings.push(`Object storage -> ${services.storage}`);
+  if (/(cdn|static assets)/i.test(text)) mappings.push(`CDN/static assets -> ${services.cdn}`);
+  if (/(load balancer|ingress)/i.test(text)) mappings.push(`HTTP/S load balancer or ingress -> ${services.loadBalancer}`);
+  if (/(message queue|event bus|asynchronous events|messages)/i.test(text)) mappings.push(`Message queue/event bus -> ${services.queue}`);
+  if (/(monitoring|logging|log ingestion|logs)/i.test(text)) mappings.push(`Monitoring/logging -> ${services.monitoring}`);
+  if (/\bbackup\b/i.test(text)) mappings.push(`Backup -> ${services.backup}`);
   return mappings;
 }
 

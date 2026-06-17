@@ -1,4 +1,4 @@
-export const providers = ['azure'] as const;
+export const providers = ['azure', 'aws', 'gcp'] as const;
 export const services = ['virtual-machines'] as const;
 export const operatingSystems = ['linux'] as const;
 export const imageTypes = ['ubuntu'] as const;
@@ -6,7 +6,7 @@ export const tiers = ['standard'] as const;
 export const categories = ['all'] as const;
 export const pricingModels = ['pay-as-you-go'] as const;
 export const confidenceLevels = ['low', 'medium', 'high'] as const;
-export const pricingSources = ['azure-retail-prices-api', 'fallback'] as const;
+export const pricingSources = ['azure-retail-prices-api', 'early-proposal-rate-card', 'fallback'] as const;
 
 export type Provider = (typeof providers)[number];
 export type AzureService = (typeof services)[number];

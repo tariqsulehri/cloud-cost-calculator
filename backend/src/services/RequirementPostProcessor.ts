@@ -41,7 +41,8 @@ export class RequirementPostProcessor {
       const storageType = (component as DatabaseComponent).storageType ?? (storageGb && /\bssd\b/i.test(normalized.compact) ? 'ssd' : null);
       const missingFields = component.missingFields
         .filter((field) => !(highAvailability === true && field === 'highAvailability'))
-        .filter((field) => !(storageGb && field === 'storageGb'));
+        .filter((field) => !(storageGb && field === 'storageGb'))
+        .filter((field) => !(storageType && field === 'storageType'));
       return {
         ...component,
         highAvailability,

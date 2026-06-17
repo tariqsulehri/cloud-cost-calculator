@@ -2,15 +2,19 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { LLMRequirementExtractionService } from '../services/LLMRequirementExtractionService.js';
 import { RequirementRefinementService } from '../services/RequirementRefinementService.js';
-import type { NormalizedInfrastructureRequirement } from '../types/estimate.types.js';
+import { providers, type NormalizedInfrastructureRequirement, type Provider } from '../types/estimate.types.js';
 
 const extractSchema = z.object({
   requirementText: z.string().trim().min(1, 'Requirement text is required.').max(10000)
 });
 
+const refineSchema = extractSchema.extend({
+  provider: z.enum(providers).optional().default('azure')
+});
+
 export interface RequirementExtractor {
   extractRequirements(requirementText: string): NormalizedInfrastructureRequirement | Promise<NormalizedInfrastructureRequirement>;
-  refineRequirements?(requirementText: string): string | Promise<string>;
+  refineRequirements?(requirementText: string, provider?: Provider): string | Promise<string>;
 }
 
 export function createRequirementsRouter(extractionService: RequirementExtractor = new LLMRequirementExtractionService()) {
@@ -31,8 +35,8 @@ export function createRequirementsRouter(extractionService: RequirementExtractor
 
   router.post('/requirements/refine', async (req, res, next) => {
     try {
-      const payload = extractSchema.parse(req.body);
-      res.json({ refinedPrompt: await refinementService.refineRequirements(payload.requirementText) });
+      const payload = refineSchema.parse(req.body);
+      res.json({ refinedPrompt: await refinementService.refineRequirements(payload.requirementText, payload.provider) });
     } catch (error) {
       next(error);
     }

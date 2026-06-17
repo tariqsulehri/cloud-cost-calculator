@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import Database from 'better-sqlite3';
+import { cloudServiceSeeds } from './cloudServices.seed.js';
 import type { AzureRetailPriceItem } from '../types/azure.types.js';
 import type { NormalizedComponentType } from '../types/estimate.types.js';
 
@@ -8,6 +9,7 @@ type BetterSqliteDatabase = Database.Database;
 type SqlInputValue = null | number | bigint | string | Buffer | Uint8Array;
 
 export type CloudProvider = 'azure' | 'aws' | 'gcp';
+export type ServiceMappingStatus = 'mapped' | 'no_direct_equivalent' | 'manual_review';
 
 export interface CatalogServiceRow {
   id: number;
@@ -19,6 +21,9 @@ export interface CatalogServiceRow {
   pricingServiceName: string | null;
   serviceFamily: string | null;
   defaultPricingStatus: string;
+  sourceCategory: string | null;
+  mappingStatus: ServiceMappingStatus;
+  notes: string | null;
 }
 
 export interface CatalogServiceListItem extends CatalogServiceRow {
@@ -74,9 +79,12 @@ interface RetailPriceMeterDbRow {
   updated_at: string;
 }
 
-interface SeedService {
+export interface SeedService {
   serviceKey: string;
   componentType: NormalizedComponentType;
+  sourceCategory?: string | null;
+  mappingStatus?: ServiceMappingStatus;
+  notes?: string | null;
   aliases: string[];
   providers: Record<
     CloudProvider,
@@ -85,6 +93,8 @@ interface SeedService {
       providerNamespace?: string | null;
       pricingServiceName?: string | null;
       serviceFamily?: string | null;
+      mappingStatus?: ServiceMappingStatus;
+      notes?: string | null;
     }
   >;
 }
@@ -99,6 +109,9 @@ interface CatalogServiceDbRow {
   pricing_service_name: string | null;
   service_family: string | null;
   default_pricing_status: string;
+  source_category: string | null;
+  mapping_status: ServiceMappingStatus;
+  notes: string | null;
 }
 
 const providers: Array<{ id: CloudProvider; name: string }> = [
@@ -365,6 +378,8 @@ export class CloudCatalogDatabase {
       const normalizedQuery = `%${this.normalizeAlias(filters.query)}%`;
       conditions.push(
         `(lower(canonical_name) like ?
+          or lower(coalesce(service_family, '')) like ?
+          or lower(coalesce(source_category, '')) like ?
           or service_key like ?
           or exists (
             select 1 from service_aliases a
@@ -372,14 +387,15 @@ export class CloudCatalogDatabase {
               and a.normalized_alias like ?
           ))`
       );
-      params.push(normalizedQuery, normalizedQuery, normalizedQuery);
+      params.push(normalizedQuery, normalizedQuery, normalizedQuery, normalizedQuery, normalizedQuery);
     }
 
     const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : '';
     const rows = this.connection
       .prepare(
         `select id, service_key, provider_id, component_type, canonical_name, provider_namespace,
-                pricing_service_name, service_family, default_pricing_status
+                pricing_service_name, service_family, default_pricing_status, source_category,
+                mapping_status, notes
          from cloud_services
          ${where}
          order by component_type, service_key, provider_id`
@@ -587,6 +603,9 @@ export class CloudCatalogDatabase {
         pricing_service_name text,
         service_family text,
         default_pricing_status text not null default 'cataloged',
+        source_category text,
+        mapping_status text not null default 'mapped',
+        notes text,
         created_at text not null default current_timestamp,
         updated_at text not null default current_timestamp,
         unique(provider_id, service_key)
@@ -649,9 +668,20 @@ export class CloudCatalogDatabase {
       );
     `);
 
+    this.ensureColumn(db, 'cloud_services', 'source_category', 'text');
+    this.ensureColumn(db, 'cloud_services', 'mapping_status', "text not null default 'mapped'");
+    this.ensureColumn(db, 'cloud_services', 'notes', 'text');
+
     this.seedProviders();
     this.seedServices();
     this.seedRequiredFields();
+  }
+
+  private ensureColumn(db: BetterSqliteDatabase, tableName: string, columnName: string, definition: string): void {
+    const columns = db.prepare(`pragma table_info(${tableName})`).all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === columnName)) {
+      db.exec(`alter table ${tableName} add column ${columnName} ${definition}`);
+    }
   }
 
   private seedProviders(): void {
@@ -667,15 +697,19 @@ export class CloudCatalogDatabase {
     const serviceStatement = this.connection.prepare(
       `insert into cloud_services (
          service_key, provider_id, component_type, canonical_name, provider_namespace,
-         pricing_service_name, service_family, default_pricing_status, updated_at
+         pricing_service_name, service_family, default_pricing_status, source_category,
+         mapping_status, notes, updated_at
        )
-       values (?, ?, ?, ?, ?, ?, ?, 'cataloged', current_timestamp)
+       values (?, ?, ?, ?, ?, ?, ?, 'cataloged', ?, ?, ?, current_timestamp)
        on conflict(provider_id, service_key) do update set
          component_type = excluded.component_type,
          canonical_name = excluded.canonical_name,
          provider_namespace = excluded.provider_namespace,
          pricing_service_name = excluded.pricing_service_name,
          service_family = excluded.service_family,
+         source_category = excluded.source_category,
+         mapping_status = excluded.mapping_status,
+         notes = excluded.notes,
          updated_at = current_timestamp`
     );
     const serviceIdStatement = this.connection.prepare(`select id from cloud_services where provider_id = ? and service_key = ?`);
@@ -685,7 +719,9 @@ export class CloudCatalogDatabase {
        on conflict(service_id, normalized_alias) do update set alias = excluded.alias`
     );
 
-    for (const service of seedServices) {
+    const allSeedServices = [...cloudServiceSeeds, ...seedServices];
+
+    for (const service of allSeedServices) {
       for (const provider of providers) {
         const providerService = service.providers[provider.id];
         serviceStatement.run(
@@ -695,7 +731,10 @@ export class CloudCatalogDatabase {
           providerService.canonicalName,
           providerService.providerNamespace ?? null,
           providerService.pricingServiceName ?? null,
-          providerService.serviceFamily ?? null
+          providerService.serviceFamily ?? null,
+          service.sourceCategory ?? providerService.serviceFamily ?? null,
+          providerService.mappingStatus ?? service.mappingStatus ?? 'mapped',
+          providerService.notes ?? service.notes ?? null
         );
 
         const serviceIdRow = serviceIdStatement.get(provider.id, service.serviceKey) as { id: number } | undefined;
@@ -703,7 +742,10 @@ export class CloudCatalogDatabase {
           continue;
         }
 
-        [...service.aliases, providerService.canonicalName].forEach((alias) => {
+        [...service.aliases, service.sourceCategory, providerService.serviceFamily, providerService.canonicalName].forEach((alias) => {
+          if (!alias) {
+            return;
+          }
           aliasStatement.run(serviceIdRow.id, alias, this.normalizeAlias(alias));
         });
       }
@@ -746,6 +788,9 @@ export class CloudCatalogDatabase {
       pricingServiceName: row.pricing_service_name,
       serviceFamily: row.service_family,
       defaultPricingStatus: row.default_pricing_status,
+      sourceCategory: row.source_category,
+      mappingStatus: row.mapping_status,
+      notes: row.notes,
       aliases: aliases.map((alias) => alias.alias),
       requiredFields: this.requiredFields(row.provider_id, row.component_type)
     };

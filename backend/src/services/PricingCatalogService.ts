@@ -33,7 +33,7 @@ export class PricingCatalogService {
 
     while (nextUrl) {
       const response = await this.requestWithRetry(nextUrl, 2);
-      hadRequestFailure = hadRequestFailure || response.failed;
+      hadRequestFailure = hadRequestFailure || response.failed === true;
       items.push(...(response.Items ?? []));
       nextUrl = response.NextPageLink;
     }

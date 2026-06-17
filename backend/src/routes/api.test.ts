@@ -77,13 +77,15 @@ describe('api routes', () => {
     const response = await invoke('GET', '/api/catalog/services?provider=azure&q=redis');
 
     expect(response.status).toBe(200);
-    expect(response.body.services).toHaveLength(1);
-    expect(response.body.services[0]).toMatchObject({
+    expect(response.body.services.length).toBeGreaterThanOrEqual(2);
+    expect(response.body.services).toContainEqual(expect.objectContaining({
       serviceKey: 'cache.redis',
       providerId: 'azure',
       canonicalName: 'Azure Cache for Redis',
+      sourceCategory: 'Databases',
+      mappingStatus: 'mapped',
       requiredFields: ['engine', 'memoryGb', 'tier']
-    });
+    }));
   });
 
   it('POST /api/catalog/sync/azure-retail-prices syncs Azure meter metadata', async () => {
@@ -179,6 +181,25 @@ describe('api routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.refinedPrompt).toContain('Refined:');
     expect(response.body.refinedPrompt).toContain('2 web servers');
+  });
+
+  it('POST /api/requirements/refine passes preferred provider to refinement', async () => {
+    const response = await invoke(
+      'POST',
+      '/api/requirements/refine',
+      { requirementText: examplePrompt, provider: 'aws' },
+      {
+        async extractRequirements() {
+          throw new Error('not used');
+        },
+        async refineRequirements(_requirementText, provider) {
+          return `Provider: ${provider}`;
+        }
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.refinedPrompt).toBe('Provider: aws');
   });
 
   it('POST /api/requirements/refine rejects empty prompts', async () => {
@@ -306,6 +327,75 @@ describe('api routes', () => {
     expect(response.body.calculatedLineItems).toEqual(expect.arrayContaining([expect.objectContaining({ serviceName: 'Azure CDN', monthlyCost: 82.94 })]));
     expect(response.body.notImplementedLineItems).toEqual([]);
     expect(response.body.missingRequiredFieldLineItems.map((item: { type: string }) => item.type)).toEqual(['database', 'cache', 'load_balancer']);
+  });
+
+  it('POST /api/estimate returns AWS early proposal pricing from mapped requirements', async () => {
+    const extracted = await invoke('POST', '/api/requirements/extract', { requirementText: examplePrompt });
+
+    const response = await invoke('POST', '/api/estimate', { provider: 'aws', requirements: extracted.body });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      provider: 'aws',
+      region: 'us-east-1',
+      currency: 'USD'
+    });
+    expect(response.body.totalMonthlyCost).toBeGreaterThan(0);
+    expect(response.body.assumptions).toContain('AWS uses an early proposal rate card. It is not connected to live provider pricing APIs yet.');
+    expect(response.body.calculatedLineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'Compute',
+          pricingSource: 'early-proposal-rate-card'
+        }),
+        expect.objectContaining({
+          serviceName: 'Amazon CloudFront',
+          pricingSource: 'early-proposal-rate-card'
+        })
+      ])
+    );
+  });
+
+  it('POST /api/estimate prices selected Azure optional add-ons with planning rates', async () => {
+    const requirements = {
+      region: {
+        raw: 'US East',
+        normalized: 'eastus',
+        providerRegion: { azure: 'eastus', aws: 'us-east-1', gcp: 'us-east1' },
+        confidence: 'high'
+      },
+      components: [
+        {
+          id: 'optional-nat-gateway',
+          type: 'network',
+          name: 'NAT Gateway',
+          providerServiceHint: { azure: 'Azure NAT Gateway', aws: 'NAT Gateway', gcp: 'Cloud NAT' },
+          pricingStatus: 'not_implemented',
+          confidence: 'high',
+          missingFields: [],
+          assumptions: ['Optional add-on selected by user.'],
+          rawText: 'NAT Gateway optional add-on',
+          optionalAddon: 'nat-gateway',
+          gatewayCount: 1,
+          monthlyDataProcessedGb: 500
+        }
+      ],
+      globalAssumptions: [],
+      clarifyingQuestions: []
+    };
+
+    const response = await invoke('POST', '/api/estimate', { provider: 'azure', requirements });
+
+    expect(response.status).toBe(200);
+    expect(response.body.calculatedLineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceName: 'Azure NAT Gateway',
+          pricingSource: 'early-proposal-rate-card'
+        })
+      ])
+    );
+    expect(response.body.totalMonthlyCost).toBeGreaterThan(0);
   });
 
   it('POST /api/estimate prices AKS worker nodes as VM compute', async () => {
