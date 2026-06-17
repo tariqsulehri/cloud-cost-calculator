@@ -1,4 +1,5 @@
 import { ComponentRequirementCard } from './ComponentRequirementCard';
+import { InfoBadge } from './InfoBadge';
 import type { NormalizedInfrastructureRequirement } from '../types/estimate';
 
 interface RequirementReviewProps {
@@ -27,15 +28,28 @@ export function RequirementReview({ requirements, onComponentUpdate }: Requireme
             <h2 className="text-lg font-semibold text-navy">Step 2: Review Detected Requirements</h2>
             <p className="mt-1 text-sm text-muted">Confirm extracted Azure services before calculation. Expand rows to inspect evidence and assumptions.</p>
           </div>
-          <span className="rounded-full border border-violet/20 bg-violet/10 px-3 py-1 text-xs font-semibold text-violet">{extractionLabel}</span>
+          <InfoBadge
+            label={extractionLabel}
+            tooltip={
+              requirements.extractionMethod === 'llm'
+                ? 'AI read your text and found cloud services.'
+                : 'The app used simple rules because AI was not available.'
+            }
+            className="border-violet/20 bg-violet/10 text-violet"
+          />
         </div>
       </div>
 
       <div className="grid gap-3 bg-white px-5 py-4 sm:grid-cols-4">
-        <SummaryTile label="Azure region" value={requirements.region.providerRegion.azure} />
-        <SummaryTile label="Supported" value={String(supportedComponents.length)} />
-        <SummaryTile label="Not implemented" value={String(notImplementedComponents.length)} />
-        <SummaryTile label="Needs review" value={String(reviewComponents.length)} tone={reviewComponents.length > 0 ? 'warning' : 'neutral'} />
+        <SummaryTile label="Azure region" value={requirements.region.providerRegion.azure} description="The Azure location used for pricing." />
+        <SummaryTile label="Ready" value={String(supportedComponents.length)} description="These services have enough details to price." />
+        <SummaryTile label="Price not ready" value={String(notImplementedComponents.length)} description="The app detected these services, but pricing is not built yet." />
+        <SummaryTile
+          label="Need info"
+          value={String(reviewComponents.length)}
+          description="These services need missing details or a quick check."
+          tone={reviewComponents.length > 0 ? 'warning' : 'neutral'}
+        />
       </div>
 
       <div className="px-5 py-5">
@@ -49,7 +63,7 @@ export function RequirementReview({ requirements, onComponentUpdate }: Requireme
           onComponentUpdate={onComponentUpdate}
         />
         <ComponentGroup
-          title="Detected but pricing not implemented"
+          title="Detected, price not ready"
           components={notImplementedComponents}
           emptyText="No unpriced detected services."
           onComponentUpdate={onComponentUpdate}
@@ -62,11 +76,12 @@ export function RequirementReview({ requirements, onComponentUpdate }: Requireme
   );
 }
 
-function SummaryTile({ label, value, tone = 'neutral' }: { label: string; value: string; tone?: 'neutral' | 'warning' }) {
+function SummaryTile({ label, value, description, tone = 'neutral' }: { label: string; value: string; description: string; tone?: 'neutral' | 'warning' }) {
   return (
-    <div className="rounded-lg border border-line bg-slate-50 px-4 py-3 shadow-sm">
+    <div title={description} className="rounded-lg border border-line bg-slate-50 px-4 py-3 shadow-sm">
       <div className="text-xs font-semibold uppercase text-muted">{label}</div>
       <div className={`mt-1 text-lg font-semibold ${tone === 'warning' ? 'text-warning' : 'text-navy'}`}>{value}</div>
+      <div className="mt-1 text-xs leading-5 text-muted">{description}</div>
     </div>
   );
 }

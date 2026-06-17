@@ -1,4 +1,13 @@
-import { confidenceClass, formatCurrency, pricingSourceClass, pricingSourceLabel } from '../lib/format';
+import {
+  confidenceClass,
+  confidenceDescription,
+  confidenceLabel,
+  formatCurrency,
+  pricingSourceClass,
+  pricingSourceDescription,
+  pricingSourceLabel
+} from '../lib/format';
+import { InfoBadge } from './InfoBadge';
 import type { EstimateResponse } from '../types/estimate';
 
 interface VmCostSummaryProps {
@@ -14,19 +23,20 @@ export function VmCostSummary({ estimate }: VmCostSummaryProps) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-azure">Azure</span>
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${confidenceClass(estimate.confidence)}`}>
-              {estimate.confidence} confidence
-            </span>
+            <InfoBadge label="Azure" tooltip="This estimate is for Microsoft Azure services only." className="border-blue-200 bg-blue-50 text-azure" align="left" />
+            <InfoBadge
+              label={confidenceLabel(estimate.confidence)}
+              tooltip={confidenceDescription(estimate.confidence)}
+              className={confidenceClass(estimate.confidence)}
+              align="left"
+            />
           </div>
           <h2 className="mt-4 text-xl font-semibold text-slate-950">Virtual Machines</h2>
           <p className="mt-1 text-sm text-slate-600">
             {item.quantity} {item.skuName} x {item.hours.toLocaleString()} Hours
           </p>
         </div>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${pricingSourceClass(item.pricingSource)}`}>
-          {pricingSourceLabel(item.pricingSource)}
-        </span>
+        <InfoBadge label={pricingSourceLabel(item.pricingSource)} tooltip={pricingSourceDescription(item.pricingSource)} className={pricingSourceClass(item.pricingSource)} />
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-4">

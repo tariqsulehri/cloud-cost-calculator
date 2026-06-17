@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock3 } from 'lucide-react';
 import { useState } from 'react';
-import { confidenceClass } from '../lib/format';
+import { confidenceClass, confidenceDescription, confidenceLabel } from '../lib/format';
+import { InfoBadge } from './InfoBadge';
 import type { NormalizedComponent } from '../types/estimate';
 
 interface ComponentRequirementCardProps {
@@ -13,7 +14,7 @@ export function ComponentRequirementCard({ component, onUpdate }: ComponentRequi
   const Icon = statusIcon(component);
 
   return (
-    <article className="overflow-hidden rounded-lg border border-line bg-white shadow-sm transition hover:border-teal/30 hover:shadow-card">
+    <article className="overflow-visible rounded-lg border border-line bg-white shadow-sm transition hover:border-teal/30 hover:shadow-card">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
@@ -33,12 +34,8 @@ export function ComponentRequirementCard({ component, onUpdate }: ComponentRequi
           </div>
         </div>
         <div className="flex flex-none items-center gap-2">
-          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(component)}`}>
-            {statusLabel(component)}
-          </span>
-          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${confidenceClass(component.confidence)}`}>
-            {component.confidence}
-          </span>
+          <InfoBadge label={statusLabel(component)} tooltip={statusDescription(component)} className={statusClass(component)} />
+          <InfoBadge label={confidenceLabel(component.confidence)} tooltip={confidenceDescription(component.confidence)} className={confidenceClass(component.confidence)} />
           {expanded ? <ChevronDown className="h-4 w-4 text-muted" aria-hidden="true" /> : <ChevronRight className="h-4 w-4 text-muted" aria-hidden="true" />}
         </div>
       </button>
@@ -382,11 +379,33 @@ function DetailsGrid({
 }
 
 function statusLabel(component: NormalizedComponent): string {
+  const status = statusKind(component);
+  const labels: Record<ReturnType<typeof statusKind>, string> = {
+    supported: 'Ready',
+    notImplemented: 'Price not ready',
+    needsReview: 'Need info',
+    unsupported: "Can't price"
+  };
+  return labels[status];
+}
+
+function statusDescription(component: NormalizedComponent): string {
+  const status = statusKind(component);
+  const descriptions: Record<ReturnType<typeof statusKind>, string> = {
+    supported: 'All needed details are present. This service can be priced.',
+    notImplemented: 'The app detected this service, but pricing for it is not built yet.',
+    needsReview: 'Some required details are missing. Add them before estimating.',
+    unsupported: 'This service or setup cannot be priced by the app right now.'
+  };
+  return descriptions[status];
+}
+
+function statusKind(component: NormalizedComponent): 'supported' | 'notImplemented' | 'needsReview' | 'unsupported' {
   if (component.missingFields.length > 0 || component.pricingStatus === 'missing_required_fields' || component.pricingStatus === 'needs_review') {
-    return 'needs review';
+    return 'needsReview';
   }
   if (component.pricingStatus === 'not_implemented') {
-    return 'not implemented';
+    return 'notImplemented';
   }
   if (component.pricingStatus === 'supported') {
     return 'supported';
@@ -395,36 +414,36 @@ function statusLabel(component: NormalizedComponent): string {
 }
 
 function statusClass(component: NormalizedComponent): string {
-  const label = statusLabel(component);
-  if (label === 'supported') {
+  const status = statusKind(component);
+  if (status === 'supported') {
     return 'border-emerald-200 bg-emerald-50 text-success';
   }
-  if (label === 'not implemented') {
+  if (status === 'notImplemented') {
     return 'border-violet/20 bg-violet/10 text-violet';
   }
-  if (label === 'needs review') {
+  if (status === 'needsReview') {
     return 'border-amber-200 bg-amber-50 text-warning';
   }
   return 'border-red-200 bg-red-50 text-danger';
 }
 
 function statusIcon(component: NormalizedComponent) {
-  const label = statusLabel(component);
-  if (label === 'supported') {
+  const status = statusKind(component);
+  if (status === 'supported') {
     return CircleCheck;
   }
-  if (label === 'not implemented') {
+  if (status === 'notImplemented') {
     return Clock3;
   }
   return CircleAlert;
 }
 
 function statusIconClass(component: NormalizedComponent): string {
-  const label = statusLabel(component);
-  if (label === 'supported') {
+  const status = statusKind(component);
+  if (status === 'supported') {
     return 'border-emerald-200 bg-emerald-50 text-success';
   }
-  if (label === 'not implemented') {
+  if (status === 'notImplemented') {
     return 'border-violet/20 bg-violet/10 text-violet';
   }
   return 'border-amber-200 bg-amber-50 text-warning';

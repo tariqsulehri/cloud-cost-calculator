@@ -1,4 +1,5 @@
-import { formatCurrency, pricingSourceLabel } from '../lib/format';
+import { formatCurrency, pricingSourceClass, pricingSourceDescription, pricingSourceLabel } from '../lib/format';
+import { InfoBadge } from './InfoBadge';
 import type { NaturalLanguageEstimateResponse } from '../types/estimate';
 
 interface EstimateSummaryProps {
@@ -20,9 +21,11 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
           </p>
         </div>
         {quality ? (
-          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${qualityBadgeClass(quality.status)}`}>
-            {quality.status} · {quality.coveragePercent}% priced
-          </span>
+          <InfoBadge
+            label={`${qualityLabel(quality.status)} · ${quality.coveragePercent}% priced`}
+            tooltip={qualityDescription(quality.status)}
+            className={qualityBadgeClass(quality.status)}
+          />
         ) : null}
       </div>
       <div className="mt-3 text-4xl font-bold text-teal">{formatCurrency(estimate.totalMonthlyCost, estimate.currency)}</div>
@@ -75,7 +78,14 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
                     </td>
                     <td className="px-4 py-3">{formatCurrency(item.unitPrice, estimate.currency)}</td>
                     <td className="px-4 py-3 font-semibold">{formatCurrency(item.monthlyCost, estimate.currency)}</td>
-                    <td className="px-4 py-3">{pricingSourceLabel(item.pricingSource)}</td>
+                    <td className="px-4 py-3">
+                      <InfoBadge
+                        label={pricingSourceLabel(item.pricingSource)}
+                        tooltip={pricingSourceDescription(item.pricingSource)}
+                        className={pricingSourceClass(item.pricingSource)}
+                        align="left"
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -86,8 +96,8 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
       </div>
 
       <div className="mt-5">
-        <h3 className="text-sm font-semibold text-navy">Detected but pricing not implemented yet</h3>
-        <UnpricedItems items={estimate.notImplementedLineItems} emptyText="No not-implemented services detected." />
+        <h3 className="text-sm font-semibold text-navy">Detected, price not ready</h3>
+        <UnpricedItems items={estimate.notImplementedLineItems} emptyText="No services waiting for pricing support." />
       </div>
 
       <div className="mt-5">
@@ -96,8 +106,8 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
       </div>
 
       <div className="mt-5">
-        <h3 className="text-sm font-semibold text-navy">Unsupported or needs review</h3>
-        <UnpricedItems items={estimate.unsupportedLineItems} emptyText="No unsupported services detected." />
+        <h3 className="text-sm font-semibold text-navy">Need review or cannot price</h3>
+        <UnpricedItems items={estimate.unsupportedLineItems} emptyText="No services need review here." />
       </div>
 
       <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
@@ -122,6 +132,26 @@ function qualityBadgeClass(status: 'complete' | 'partial' | 'blocked'): string {
     return 'border-amber-200 bg-amber-50 text-warning';
   }
   return 'border-red-200 bg-red-50 text-danger';
+}
+
+function qualityLabel(status: 'complete' | 'partial' | 'blocked'): string {
+  if (status === 'complete') {
+    return 'Complete';
+  }
+  if (status === 'partial') {
+    return 'Partial';
+  }
+  return 'Blocked';
+}
+
+function qualityDescription(status: 'complete' | 'partial' | 'blocked'): string {
+  if (status === 'complete') {
+    return 'All detected services that the app can price are included.';
+  }
+  if (status === 'partial') {
+    return 'Some services are priced, but some are missing or not ready.';
+  }
+  return 'No useful total yet. Add missing details or choose supported services.';
 }
 
 function UnpricedItems({

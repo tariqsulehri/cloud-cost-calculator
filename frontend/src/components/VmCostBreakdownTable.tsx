@@ -1,4 +1,13 @@
-import { confidenceClass, formatCurrency, pricingSourceClass, pricingSourceLabel } from '../lib/format';
+import {
+  confidenceClass,
+  confidenceDescription,
+  confidenceLabel,
+  formatCurrency,
+  pricingSourceClass,
+  pricingSourceDescription,
+  pricingSourceLabel
+} from '../lib/format';
+import { InfoBadge } from './InfoBadge';
 import type { EstimateLineItem } from '../types/estimate';
 
 interface VmCostBreakdownTableProps {
@@ -41,14 +50,15 @@ export function VmCostBreakdownTable({ lineItems, currency }: VmCostBreakdownTab
                 <td className="px-5 py-4 text-right text-slate-700">{formatCurrency(item.unitPrice, currency)}</td>
                 <td className="px-5 py-4 text-right font-semibold text-slate-950">{formatCurrency(item.monthlyCost, currency)}</td>
                 <td className="px-5 py-4">
-                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${confidenceClass(item.confidence)}`}>
-                    {item.confidence}
-                  </span>
+                  <InfoBadge label={confidenceLabel(item.confidence)} tooltip={confidenceDescription(item.confidence)} className={confidenceClass(item.confidence)} align="left" />
                 </td>
                 <td className="px-5 py-4">
-                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${pricingSourceClass(item.pricingSource)}`}>
-                    {pricingSourceLabel(item.pricingSource)}
-                  </span>
+                  <InfoBadge
+                    label={pricingSourceLabel(item.pricingSource)}
+                    tooltip={pricingSourceDescription(item.pricingSource)}
+                    className={pricingSourceClass(item.pricingSource)}
+                    align="left"
+                  />
                 </td>
               </tr>
             ))}
