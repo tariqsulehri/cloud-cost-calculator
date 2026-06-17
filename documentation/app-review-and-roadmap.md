@@ -202,7 +202,9 @@ Recommended build order:
    - Keep missing and unpriced services visible.
 
 2. Add service mapping search.
-   - Search by words like Redis, VM, PostgreSQL, Kubernetes, storage, CDN, queue, monitoring, or load balancer.
+   - Select Azure, AWS, or GCP first.
+   - Search inside that provider's real service list.
+   - Select a catalog service instead of typing a free-form service name.
    - Show Azure, AWS, and GCP names side by side.
    - Mark Azure as pricing active and AWS/GCP as mapping only until adapters are ready.
 

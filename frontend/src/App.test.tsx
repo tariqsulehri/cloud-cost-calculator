@@ -175,7 +175,7 @@ const extractedCacheOnlyRequirements: NormalizedInfrastructureRequirement = {
 const mappedCatalogServices: CatalogService[] = [
   {
     id: 1,
-    serviceKey: 'redis_cache',
+    serviceKey: 'cache.redis',
     providerId: 'azure',
     componentType: 'cache',
     canonicalName: 'Azure Cache for Redis',
@@ -188,7 +188,7 @@ const mappedCatalogServices: CatalogService[] = [
   },
   {
     id: 2,
-    serviceKey: 'redis_cache',
+    serviceKey: 'cache.redis',
     providerId: 'aws',
     componentType: 'cache',
     canonicalName: 'Amazon ElastiCache for Redis',
@@ -201,7 +201,7 @@ const mappedCatalogServices: CatalogService[] = [
   },
   {
     id: 3,
-    serviceKey: 'redis_cache',
+    serviceKey: 'cache.redis',
     providerId: 'gcp',
     componentType: 'cache',
     canonicalName: 'Memorystore for Redis',
@@ -274,7 +274,18 @@ describe('App', () => {
     vi.mocked(extractRequirements).mockResolvedValue(extractedRequirements);
     vi.mocked(refineRequirements).mockImplementation(async (value: string) => value);
     vi.mocked(createNaturalLanguageEstimate).mockResolvedValue(estimateResponse);
-    vi.mocked(searchCatalogServices).mockResolvedValue(mappedCatalogServices);
+    vi.mocked(searchCatalogServices).mockImplementation(async (query = '', options = {}) => {
+      const normalizedQuery = query.toLowerCase();
+      return mappedCatalogServices.filter((service) => {
+        const matchesProvider = options.provider ? service.providerId === options.provider : true;
+        const matchesQuery = normalizedQuery
+          ? service.serviceKey.toLowerCase().includes(normalizedQuery) ||
+            service.canonicalName.toLowerCase().includes(normalizedQuery) ||
+            service.aliases.some((alias) => alias.toLowerCase().includes(normalizedQuery))
+          : true;
+        return matchesProvider && matchesQuery;
+      });
+    });
   });
 
   afterEach(() => {
@@ -299,9 +310,12 @@ describe('App', () => {
     render(<App />);
 
     await userEvent.click(screen.getByRole('button', { name: /Service Mapping/ }));
+    expect(screen.getByLabelText('Cloud provider')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search and select service')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('option', { name: /Amazon ElastiCache for Redis/ }));
 
     expect(await screen.findByText('Azure Cache for Redis')).toBeInTheDocument();
-    expect(screen.getByText('Amazon ElastiCache for Redis')).toBeInTheDocument();
+    expect(screen.getAllByText('Amazon ElastiCache for Redis').length).toBeGreaterThan(0);
     expect(screen.getByText('Memorystore for Redis')).toBeInTheDocument();
   });
 

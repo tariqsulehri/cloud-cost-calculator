@@ -45,9 +45,16 @@ export async function createNaturalLanguageEstimate(payload: NormalizedEstimateR
   return response.data;
 }
 
-export async function searchCatalogServices(query: string): Promise<CatalogService[]> {
+export async function searchCatalogServices(
+  query = '',
+  options: { provider?: CatalogService['providerId'] } = {}
+): Promise<CatalogService[]> {
+  const params = {
+    ...(query.trim() ? { q: query.trim() } : {}),
+    ...(options.provider ? { provider: options.provider } : {})
+  };
   const response = await api.get<{ services: CatalogService[] }>('/catalog/services', {
-    params: query.trim() ? { q: query.trim() } : undefined
+    params: Object.keys(params).length > 0 ? params : undefined
   });
   return response.data.services;
 }
