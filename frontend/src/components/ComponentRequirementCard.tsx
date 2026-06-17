@@ -130,14 +130,17 @@ function ReviewEditor({ component, onUpdate }: { component: NormalizedComponent;
                 <option value="false">No</option>
               </select>
             ) : (
-              <input
-                type={field.kind === 'number' ? 'number' : 'text'}
-                min={field.kind === 'number' ? 0 : undefined}
-                value={values[field.key] ?? ''}
-                onChange={(event) => setField(field.key, event.target.value)}
-                placeholder={field.placeholder}
-                className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-teal focus:ring-4 focus:ring-teal/10"
-              />
+              <>
+                <input
+                  type={field.kind === 'number' ? 'number' : 'text'}
+                  min={field.kind === 'number' ? 0 : undefined}
+                  value={values[field.key] ?? ''}
+                  onChange={(event) => setField(field.key, event.target.value)}
+                  placeholder={field.placeholder}
+                  className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-teal focus:ring-4 focus:ring-teal/10"
+                />
+                {field.hint ? <span className="mt-1 block text-xs leading-5 text-muted">{field.hint}</span> : null}
+              </>
             )}
           </label>
         ))}
@@ -152,8 +155,9 @@ function reviewEditableFields(component: NormalizedComponent): Array<{
   kind: 'number' | 'text' | 'boolean';
   placeholder?: string;
   defaultValue?: string;
+  hint?: string;
 }> {
-  const fieldMeta: Record<string, { label: string; kind: 'number' | 'text' | 'boolean'; placeholder?: string; defaultValue?: string }> = {
+  const fieldMeta: Record<string, { label: string; kind: 'number' | 'text' | 'boolean'; placeholder?: string; defaultValue?: string; hint?: string }> = {
     quantity: { label: 'Quantity', kind: 'number', placeholder: '3' },
     vcpu: { label: 'vCPU', kind: 'number', placeholder: '8' },
     memoryGb: { label: 'Memory GB', kind: 'number', placeholder: '32' },
@@ -174,7 +178,12 @@ function reviewEditableFields(component: NormalizedComponent): Array<{
       defaultValue: ['compute', 'kubernetes'].includes(component.type) ? 'ubuntu' : undefined
     },
     highAvailability: { label: 'High availability', kind: 'boolean' },
-    tier: { label: 'Tier', kind: 'text', placeholder: 'production' },
+    tier: {
+      label: 'Tier',
+      kind: 'text',
+      placeholder: 'production',
+      hint: component.type === 'cache' ? 'Production: HA/SLA, higher cost. Dev/basic: cheaper, downtime risk.' : undefined
+    },
     scheme: { label: 'Scheme', kind: 'text', placeholder: 'http_s' },
     target: { label: 'Target', kind: 'text', placeholder: component.type === 'load_balancer' ? 'API Gateway service' : undefined },
     dataTransferGb: { label: 'Data transfer GB', kind: 'number', placeholder: '3072' },
@@ -186,7 +195,7 @@ function reviewEditableFields(component: NormalizedComponent): Array<{
 
   return component.missingFields
     .map((field) => ({ key: field, ...fieldMeta[field] }))
-    .filter((field): field is { key: string; label: string; kind: 'number' | 'text' | 'boolean'; placeholder?: string; defaultValue?: string } =>
+    .filter((field): field is { key: string; label: string; kind: 'number' | 'text' | 'boolean'; placeholder?: string; defaultValue?: string; hint?: string } =>
       Boolean(field.label)
     );
 }
