@@ -29,15 +29,19 @@ export class PricingCatalogService {
 
     const items: AzureRetailPriceItem[] = [];
     let nextUrl: string | null | undefined = url;
+    let hadRequestFailure = false;
 
     while (nextUrl) {
       const response = await this.requestWithRetry(nextUrl, 2);
+      hadRequestFailure = hadRequestFailure || response.failed;
       items.push(...(response.Items ?? []));
       nextUrl = response.NextPageLink;
     }
 
     const records = items.map((item) => this.normalizePriceRecord(item));
-    this.cache.set(url, records);
+    if (!hadRequestFailure) {
+      this.cache.set(url, records);
+    }
     return records;
   }
 
@@ -105,7 +109,7 @@ export class PricingCatalogService {
     };
   }
 
-  private async requestWithRetry(url: string, attempts: number): Promise<AzureRetailPriceResponse> {
+  private async requestWithRetry(url: string, attempts: number): Promise<AzureRetailPriceResponse & { failed?: boolean }> {
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -121,7 +125,7 @@ export class PricingCatalogService {
     }
 
     console.warn(`Azure Retail Prices API request failed after ${attempts} attempts: ${url}. ${this.errorSummary(lastError)}`);
-    return { Items: [], NextPageLink: null };
+    return { Items: [], NextPageLink: null, failed: true };
   }
 
   private errorSummary(error: unknown): string {

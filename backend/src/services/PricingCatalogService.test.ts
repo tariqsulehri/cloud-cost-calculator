@@ -140,4 +140,45 @@ describe('PricingCatalogService', () => {
 
     expect(prices).toEqual([]);
   });
+
+  it('does not cache failed Azure pricing lookups as empty results', async () => {
+    nock('https://prices.azure.com').get('/api/retail/prices').query(true).times(2).reply(503, { error: 'temporary unavailable' });
+
+    nock('https://prices.azure.com')
+      .get('/api/retail/prices')
+      .query(true)
+      .reply(200, {
+        Items: [
+          {
+            currencyCode: 'USD',
+            armRegionName: 'eastus',
+            serviceName: 'Virtual Machines',
+            serviceFamily: 'Compute',
+            productName: 'Virtual Machines Dsv5 Series',
+            skuName: 'D8s v5',
+            armSkuName: 'Standard_D8s_v5',
+            meterName: 'D8s v5',
+            unitOfMeasure: '1 Hour',
+            type: 'Consumption',
+            retailPrice: 0.384
+          }
+        ],
+        NextPageLink: null
+      });
+
+    const catalog = new PricingCatalogService();
+    const filters = {
+      serviceName: 'Virtual Machines',
+      armRegionName: 'eastus',
+      armSkuName: 'Standard_D8s_v5',
+      priceType: 'Consumption'
+    };
+
+    const unavailable = await catalog.findPrices(filters);
+    const recovered = await catalog.findPrices(filters);
+
+    expect(unavailable).toEqual([]);
+    expect(recovered).toHaveLength(1);
+    expect(recovered[0]).toMatchObject({ skuName: 'D8s v5', retailPrice: 0.384 });
+  });
 });

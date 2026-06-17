@@ -101,12 +101,24 @@ export class EstimateService {
         }
 
         const sku = this.matchVmSkuForSize(component.vcpu, component.memoryGb, 'compute requirement');
+        if (!sku) {
+          unsupportedLineItems.push(
+            this.toUnpricedLineItem(component, `No deterministic Azure VM SKU mapping exists for ${component.vcpu} vCPU and ${component.memoryGb} GB RAM. Manual SKU selection is required.`)
+          );
+          continue;
+        }
+
         const vmPrice = await this.azurePricingService.getVirtualMachineHourlyPrice({
           region,
           operatingSystem: component.operatingSystem ?? 'linux',
           tier: 'standard',
           instanceSku: sku.instanceSku
         });
+        if (vmPrice.pricingSource === 'fallback') {
+          unsupportedLineItems.push(this.toUnpricedLineItem(component, vmPrice.assumption));
+          continue;
+        }
+
         const quantity = component.quantity ?? 1;
         const hours = component.monthlyHours ?? 730;
         const monthlyCost = roundMoney(vmPrice.unitPrice * quantity * hours);
@@ -142,12 +154,27 @@ export class EstimateService {
         }
 
         const sku = this.matchVmSkuForSize(vcpuPerNode, memoryGbPerNode, 'AKS worker node requirement');
+        if (!sku) {
+          unsupportedLineItems.push(
+            this.toUnpricedLineItem(
+              component,
+              `No deterministic Azure VM SKU mapping exists for AKS worker nodes with ${vcpuPerNode} vCPU and ${memoryGbPerNode} GB RAM. Manual node SKU selection is required.`
+            )
+          );
+          continue;
+        }
+
         const vmPrice = await this.azurePricingService.getVirtualMachineHourlyPrice({
           region,
           operatingSystem: component.operatingSystem === 'linux' ? 'linux' : 'linux',
           tier: 'standard',
           instanceSku: sku.instanceSku
         });
+        if (vmPrice.pricingSource === 'fallback') {
+          unsupportedLineItems.push(this.toUnpricedLineItem(component, vmPrice.assumption));
+          continue;
+        }
+
         const hours = this.numberValue(component, 'monthlyHours') ?? 730;
         const monthlyCost = roundMoney(vmPrice.unitPrice * nodeCount * hours);
         const aksAssumption = 'AKS estimate includes worker node VM compute only; AKS control plane, ingress, disks, networking, and managed add-ons are still listed separately when detected.';
@@ -760,7 +787,7 @@ export class EstimateService {
     };
   }
 
-  private matchVmSkuForSize(vcpu: number, memoryGb: number, requirementLabel: string): { instanceSku: string; assumption: string } {
+  private matchVmSkuForSize(vcpu: number, memoryGb: number, requirementLabel: string): { instanceSku: string; assumption: string } | null {
     if (vcpu === 4 && memoryGb === 16) {
       return {
         instanceSku: 'D4s v5',
@@ -782,10 +809,7 @@ export class EstimateService {
       };
     }
 
-    return {
-      instanceSku: 'D4s v5',
-      assumption: `No exact VM SKU rule matched; defaulted ${requirementLabel} to D4s v5 for pricing review.`
-    };
+    return null;
   }
 
   private numberValue(component: GenericComponent, field: string): number | null {

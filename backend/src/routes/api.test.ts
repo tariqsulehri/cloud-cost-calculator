@@ -348,6 +348,109 @@ All services should be deployed in Azure East US.`
     );
   });
 
+  it('POST /api/estimate does not count VM fallback pricing as a calculated cost', async () => {
+    nock('https://prices.azure.com')
+      .get('/api/retail/prices')
+      .query(true)
+      .reply(200, {
+        Items: [],
+        NextPageLink: null
+      });
+
+    const requirements = {
+      region: {
+        raw: 'East US',
+        normalized: 'eastus',
+        providerRegion: { azure: 'eastus', aws: 'us-east-1', gcp: 'us-east1' },
+        confidence: 'high'
+      },
+      components: [
+        {
+          id: 'compute-1',
+          type: 'compute',
+          name: 'Web servers',
+          providerServiceHint: { azure: 'Azure Virtual Machines', aws: 'Amazon EC2', gcp: 'Compute Engine' },
+          pricingStatus: 'supported',
+          confidence: 'high',
+          missingFields: [],
+          assumptions: [],
+          rawText: '2 web servers with 2 vCPU and 4 GB RAM each',
+          role: 'web server',
+          quantity: 2,
+          vcpu: 2,
+          memoryGb: 4,
+          operatingSystem: 'linux',
+          imageType: 'ubuntu',
+          monthlyHours: 730
+        }
+      ],
+      globalAssumptions: [],
+      clarifyingQuestions: [],
+      extractionMethod: 'llm'
+    };
+
+    const response = await invoke('POST', '/api/estimate', { provider: 'azure', requirements });
+
+    expect(response.status).toBe(200);
+    expect(response.body.totalMonthlyCost).toBe(0);
+    expect(response.body.calculatedLineItems).toEqual([]);
+    expect(response.body.unsupportedLineItems).toEqual([
+      expect.objectContaining({
+        componentId: 'compute-1',
+        type: 'compute',
+        reason: 'Azure Retail Prices API did not return a matching Linux pay-as-you-go VM hourly price for B2als v2 in eastus. Manual review is required.'
+      })
+    ]);
+    expect(response.body.estimateQuality).toMatchObject({ status: 'blocked', pricedComponentCount: 0, totalComponentCount: 1 });
+  });
+
+  it('POST /api/estimate requires manual SKU selection for unmapped VM shapes', async () => {
+    const requirements = {
+      region: {
+        raw: 'East US',
+        normalized: 'eastus',
+        providerRegion: { azure: 'eastus', aws: 'us-east-1', gcp: 'us-east1' },
+        confidence: 'high'
+      },
+      components: [
+        {
+          id: 'compute-1',
+          type: 'compute',
+          name: 'Application servers',
+          providerServiceHint: { azure: 'Azure Virtual Machines', aws: 'Amazon EC2', gcp: 'Compute Engine' },
+          pricingStatus: 'supported',
+          confidence: 'high',
+          missingFields: [],
+          assumptions: [],
+          rawText: '3 application servers with 6 vCPU and 24 GB RAM each',
+          role: 'application server',
+          quantity: 3,
+          vcpu: 6,
+          memoryGb: 24,
+          operatingSystem: 'linux',
+          imageType: 'ubuntu',
+          monthlyHours: 730
+        }
+      ],
+      globalAssumptions: [],
+      clarifyingQuestions: [],
+      extractionMethod: 'llm'
+    };
+
+    const response = await invoke('POST', '/api/estimate', { provider: 'azure', requirements });
+
+    expect(response.status).toBe(200);
+    expect(response.body.calculatedLineItems).toEqual([]);
+    expect(response.body.unsupportedLineItems).toEqual([
+      expect.objectContaining({
+        componentId: 'compute-1',
+        type: 'compute',
+        reason: 'No deterministic Azure VM SKU mapping exists for 6 vCPU and 24 GB RAM. Manual SKU selection is required.'
+      })
+    ]);
+    expect(response.body.estimateQuality).toMatchObject({ status: 'blocked', pricedComponentCount: 0, totalComponentCount: 1 });
+  });
+
   it('POST /api/estimate excludes ambiguous duplicate compute when AKS worker nodes are already priced', async () => {
     nock('https://prices.azure.com')
       .get('/api/retail/prices')
