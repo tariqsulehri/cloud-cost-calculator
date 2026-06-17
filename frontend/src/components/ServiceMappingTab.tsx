@@ -110,7 +110,13 @@ export function ServiceMappingTab() {
                       </div>
                       <div className="mt-2 text-sm font-bold text-navy">{row?.canonicalName ?? 'Not mapped yet'}</div>
                       <div className="mt-1 text-xs leading-5 text-slate-700">{row?.pricingServiceName ? `Pricing name: ${row.pricingServiceName}` : 'Pricing adapter planned.'}</div>
-                      {row?.requiredFields?.length ? <div className="mt-2 text-xs leading-5 text-slate-700">Needs: {row.requiredFields.join(', ')}</div> : null}
+                      {row?.serviceKey === 'network.private' ? (
+                        <div className="mt-2 text-xs leading-5 text-slate-700">
+                          Cost note: base private network is usually low or no direct charge. Price NAT, VPN, peering, firewall, public IP, and egress separately.
+                        </div>
+                      ) : row?.requiredFields?.length ? (
+                        <div className="mt-2 text-xs leading-5 text-slate-700">Needs: {row.requiredFields.join(', ')}</div>
+                      ) : null}
                     </div>
                   );
                 })}

@@ -45,6 +45,18 @@ describe('CloudCatalogDatabase', () => {
     expect(services[0].requiredFields).toEqual(['engine', 'memoryGb', 'tier']);
   });
 
+  it('maps private cloud networks across Azure, AWS, and GCP', () => {
+    const catalog = createCatalog();
+    const services = catalog.listServices({ query: 'virtual private network' });
+
+    expect(services).toHaveLength(3);
+    expect(services.map((service) => service.canonicalName).sort()).toEqual([
+      'Amazon Virtual Private Cloud (VPC)',
+      'Azure Virtual Network',
+      'Virtual Private Cloud (VPC)'
+    ]);
+  });
+
   it('upserts Azure retail price meters for later catalog lookup', () => {
     const catalog = createCatalog();
 

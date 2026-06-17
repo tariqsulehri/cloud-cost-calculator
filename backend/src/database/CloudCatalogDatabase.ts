@@ -259,6 +259,26 @@ const seedServices: SeedService[] = [
     }
   },
   {
+    serviceKey: 'network.private',
+    componentType: 'network',
+    aliases: [
+      'virtual private network',
+      'virtual private cloud',
+      'private network',
+      'cloud network',
+      'vpc',
+      'vnet',
+      'virtual network',
+      'subnet',
+      'subnets'
+    ],
+    providers: {
+      azure: { canonicalName: 'Azure Virtual Network', providerNamespace: 'Microsoft.Network', pricingServiceName: 'Virtual Network', serviceFamily: 'Networking' },
+      aws: { canonicalName: 'Amazon Virtual Private Cloud (VPC)', pricingServiceName: 'AmazonVPC', serviceFamily: 'Networking' },
+      gcp: { canonicalName: 'Virtual Private Cloud (VPC)', pricingServiceName: 'Virtual Private Cloud', serviceFamily: 'Networking' }
+    }
+  },
+  {
     serviceKey: 'backup',
     componentType: 'backup',
     aliases: ['backup', 'backup service', 'managed backup', 'azure backup', 'aws backup'],

@@ -184,8 +184,10 @@ Example mapping:
 | Object storage | Azure Blob Storage | Amazon S3 | Cloud Storage |
 | CDN | Azure CDN / Front Door | CloudFront | Cloud CDN |
 | Load balancer | Application Gateway / Load Balancer | ALB / NLB | Cloud Load Balancing |
+| Private network | Azure Virtual Network | Amazon VPC | Virtual Private Cloud |
 | Queue | Service Bus | SQS / EventBridge | Pub/Sub |
 | Monitoring | Azure Monitor | CloudWatch | Cloud Monitoring |
+| Network egress | Azure Bandwidth | AWS Data Transfer | Network Data Transfer |
 
 Each provider should have its own pricing adapter. The normalized requirement should stay shared.
 
