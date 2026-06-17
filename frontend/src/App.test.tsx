@@ -2,13 +2,14 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { createNaturalLanguageEstimate, extractRequirements, refineRequirements } from './lib/api';
-import type { NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement } from './types/estimate';
+import { createNaturalLanguageEstimate, extractRequirements, refineRequirements, searchCatalogServices } from './lib/api';
+import type { CatalogService, NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement } from './types/estimate';
 
 vi.mock('./lib/api', () => ({
   extractRequirements: vi.fn(),
   refineRequirements: vi.fn(),
   createNaturalLanguageEstimate: vi.fn(),
+  searchCatalogServices: vi.fn(),
   getApiErrorMessage: vi.fn(() => 'Request failed')
 }));
 
@@ -171,6 +172,48 @@ const extractedCacheOnlyRequirements: NormalizedInfrastructureRequirement = {
   clarifyingQuestions: []
 };
 
+const mappedCatalogServices: CatalogService[] = [
+  {
+    id: 1,
+    serviceKey: 'redis_cache',
+    providerId: 'azure',
+    componentType: 'cache',
+    canonicalName: 'Azure Cache for Redis',
+    providerNamespace: 'Microsoft.Cache',
+    pricingServiceName: 'Azure Cache for Redis',
+    serviceFamily: 'Cache',
+    defaultPricingStatus: 'supported',
+    aliases: ['redis', 'cache'],
+    requiredFields: ['tier', 'memoryGb']
+  },
+  {
+    id: 2,
+    serviceKey: 'redis_cache',
+    providerId: 'aws',
+    componentType: 'cache',
+    canonicalName: 'Amazon ElastiCache for Redis',
+    providerNamespace: null,
+    pricingServiceName: 'Amazon ElastiCache',
+    serviceFamily: 'Cache',
+    defaultPricingStatus: 'not_implemented',
+    aliases: ['redis', 'cache'],
+    requiredFields: ['tier', 'memoryGb']
+  },
+  {
+    id: 3,
+    serviceKey: 'redis_cache',
+    providerId: 'gcp',
+    componentType: 'cache',
+    canonicalName: 'Memorystore for Redis',
+    providerNamespace: null,
+    pricingServiceName: 'Memorystore',
+    serviceFamily: 'Cache',
+    defaultPricingStatus: 'not_implemented',
+    aliases: ['redis', 'cache'],
+    requiredFields: ['tier', 'memoryGb']
+  }
+];
+
 const productionMicroservicesPrompt = `I need to estimate the monthly Azure cost for a production microservices platform in US East.
 
 The application will run on Kubernetes using AKS.
@@ -231,6 +274,7 @@ describe('App', () => {
     vi.mocked(extractRequirements).mockResolvedValue(extractedRequirements);
     vi.mocked(refineRequirements).mockImplementation(async (value: string) => value);
     vi.mocked(createNaturalLanguageEstimate).mockResolvedValue(estimateResponse);
+    vi.mocked(searchCatalogServices).mockResolvedValue(mappedCatalogServices);
   });
 
   afterEach(() => {
@@ -249,6 +293,25 @@ describe('App', () => {
 
     expect(screen.getByRole('button', { name: 'Find services' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Improve text' })).toBeInTheDocument();
+  });
+
+  it('shows service mapping tab with cloud equivalents', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Service Mapping/ }));
+
+    expect(await screen.findByText('Azure Cache for Redis')).toBeInTheDocument();
+    expect(screen.getByText('Amazon ElastiCache for Redis')).toBeInTheDocument();
+    expect(screen.getByText('Memorystore for Redis')).toBeInTheDocument();
+  });
+
+  it('shows AI help tab with guarded guidance', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: /AI Help/ }));
+
+    expect(screen.getByText('Ask about the estimate')).toBeInTheDocument();
+    expect(screen.getByText(/Full AI chat can be connected later/)).toBeInTheDocument();
   });
 
   it('shows a refined prompt below and lets the user use it for extraction', async () => {

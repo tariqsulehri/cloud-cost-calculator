@@ -180,3 +180,17 @@ export interface NaturalLanguageEstimateResponse {
   assumptions: string[];
   clarifyingQuestions: string[];
 }
+
+export interface CatalogService {
+  id: number;
+  serviceKey: string;
+  providerId: 'azure' | 'aws' | 'gcp';
+  componentType: NormalizedComponentType;
+  canonicalName: string;
+  providerNamespace: string | null;
+  pricingServiceName: string | null;
+  serviceFamily: string | null;
+  defaultPricingStatus: string;
+  aliases: string[];
+  requiredFields: string[];
+}

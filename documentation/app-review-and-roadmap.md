@@ -31,6 +31,8 @@ The app can:
 - Ask for missing details.
 - Show simple status badges.
 - Show easy tooltips for badges.
+- Search service mapping across Azure, AWS, and GCP.
+- Show a guided AI help preview for plain-English estimate questions.
 - Calculate supported Azure cost lines.
 - Show unpriced services separately.
 - Keep unsupported items visible instead of adding fake cost.
@@ -67,6 +69,8 @@ Important limits:
 - Some services need manual review when sizing is missing.
 
 The app should say "Price not ready" or "Can't price" instead of showing wrong numbers.
+
+The AI help tab is not a full chat assistant yet. It gives safe answers from current app data only.
 
 ## 4. Platform Limitations
 
@@ -184,6 +188,43 @@ Example mapping:
 | Monitoring | Azure Monitor | CloudWatch | Cloud Monitoring |
 
 Each provider should have its own pricing adapter. The normalized requirement should stay shared.
+
+The Service Mapping tab should be used before building AWS and GCP pricing. It helps the team confirm that one requirement maps to the correct provider service names.
+
+## 6.1 Implementation Plan
+
+Recommended build order:
+
+1. Keep Azure estimate stable.
+   - Do not break the current Azure pricing flow.
+   - Keep missing and unpriced services visible.
+
+2. Add service mapping search.
+   - Search by words like Redis, VM, PostgreSQL, Kubernetes, storage, CDN, queue, monitoring, or load balancer.
+   - Show Azure, AWS, and GCP names side by side.
+   - Mark Azure as pricing active and AWS/GCP as mapping only until adapters are ready.
+
+3. Add guided AI help.
+   - Explain missing fields.
+   - Explain not-priced services.
+   - Explain estimate summary for a client.
+   - Explain that AWS/GCP comparison is planned.
+   - Do not invent pricing.
+
+4. Add AWS pricing adapter.
+   - Start with EC2, RDS PostgreSQL, S3, CloudFront, ALB, ElastiCache Redis, SQS, CloudWatch, and data transfer.
+   - Use the same normalized requirement model.
+
+5. Add GCP pricing adapter.
+   - Start with Compute Engine, Cloud SQL PostgreSQL, Cloud Storage, Cloud CDN, Cloud Load Balancing, Memorystore Redis, Pub/Sub, Cloud Logging, and network egress.
+   - Use the same normalized requirement model.
+
+6. Add combined comparison.
+   - Show Azure, AWS, and GCP totals.
+   - Show annual cost.
+   - Show coverage percent.
+   - Show services not included per provider.
+   - Mark totals as partial when needed.
 
 ## 7. Recommended User Flow
 

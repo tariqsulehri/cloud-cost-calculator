@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type {
   AzureRegion,
+  CatalogService,
   EstimateRequest,
   EstimateResponse,
   NaturalLanguageEstimateResponse,
@@ -42,6 +43,13 @@ export async function refineRequirements(requirementText: string): Promise<strin
 export async function createNaturalLanguageEstimate(payload: NormalizedEstimateRequest): Promise<NaturalLanguageEstimateResponse> {
   const response = await api.post<NaturalLanguageEstimateResponse>('/estimate', payload, { timeout: 90000 });
   return response.data;
+}
+
+export async function searchCatalogServices(query: string): Promise<CatalogService[]> {
+  const response = await api.get<{ services: CatalogService[] }>('/catalog/services', {
+    params: query.trim() ? { q: query.trim() } : undefined
+  });
+  return response.data.services;
 }
 
 export function getApiErrorMessage(error: unknown): string {

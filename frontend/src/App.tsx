@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { Bot, Calculator, GitCompareArrows } from 'lucide-react';
+import { AiHelpTab } from './components/AiHelpTab';
 import { CalculateEstimateButton } from './components/CalculateEstimateButton';
 import { ClarifyingQuestionsPanel } from './components/ClarifyingQuestionsPanel';
 import { ErrorAlert } from './components/ErrorAlert';
@@ -9,6 +11,7 @@ import { ProviderTabs } from './components/ProviderTabs';
 import { RequirementReview } from './components/RequirementReview';
 import { RequirementTextInput } from './components/RequirementTextInput';
 import { AssumptionsPanel } from './components/AssumptionsPanel';
+import { ServiceMappingTab } from './components/ServiceMappingTab';
 import { createNaturalLanguageEstimate, extractRequirements, getApiErrorMessage, refineRequirements } from './lib/api';
 import type { NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement } from './types/estimate';
 
@@ -19,6 +22,34 @@ A CDN for static assets, 1TB data transfer per month.
 Load balancer across both servers.
 All in US East region.`;
 
+type WorkspaceTab = 'estimate' | 'mapping' | 'ai';
+
+const workspaceTabs: Array<{
+  key: WorkspaceTab;
+  label: string;
+  helper: string;
+  icon: typeof Calculator;
+}> = [
+  {
+    key: 'estimate',
+    label: 'Estimate',
+    helper: 'Review and calculate Azure cost',
+    icon: Calculator
+  },
+  {
+    key: 'mapping',
+    label: 'Service Mapping',
+    helper: 'Find Azure, AWS, and GCP matches',
+    icon: GitCompareArrows
+  },
+  {
+    key: 'ai',
+    label: 'AI Help',
+    helper: 'Explain status in simple words',
+    icon: Bot
+  }
+];
+
 function App() {
   const [requirementText, setRequirementText] = useState(exampleRequirement);
   const [requirements, setRequirements] = useState<NormalizedInfrastructureRequirement | null>(null);
@@ -26,6 +57,7 @@ function App() {
   const [estimate, setEstimate] = useState<NaturalLanguageEstimateResponse | null>(null);
   const [loading, setLoading] = useState<'extract' | 'estimate' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('estimate');
   const requirementTextRef = useRef(exampleRequirement);
   const extractRequestRef = useRef(0);
 
@@ -149,40 +181,71 @@ function App() {
         <ProviderTabs />
         <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={Boolean(estimate)} />
 
-        <div className="grid gap-6 lg:grid-cols-[430px_minmax(0,1fr)]">
-          <RequirementTextInput
-            value={requirementText}
-            loading={loading === 'extract'}
-            onChange={handleRequirementTextChange}
-            onExtract={handleExtract}
-            onRefine={refineRequirements}
-          />
+        <nav className="grid gap-3 rounded-lg border border-line bg-white p-2 shadow-card md:grid-cols-3" aria-label="Workspace tabs">
+          {workspaceTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = workspaceTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setWorkspaceTab(tab.key)}
+                className={`flex min-h-16 items-center gap-3 rounded-md border px-4 py-3 text-left transition ${
+                  isActive
+                    ? 'border-azure bg-blue-50 text-azure shadow-sm'
+                    : 'border-transparent bg-white text-graphite hover:border-slate-200 hover:bg-slate-50'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <Icon className="h-5 w-5 flex-none" aria-hidden="true" />
+                <span>
+                  <span className="block text-sm font-bold">{tab.label}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-muted">{tab.helper}</span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
 
-          <div className="space-y-5">
-            {error ? <ErrorAlert message={error} /> : null}
-            {loading ? <LoadingState /> : null}
-            {requirements ? (
-              <>
-                <RequirementReview requirements={requirements} onComponentUpdate={handleComponentUpdate} />
-                <ClarifyingQuestionsPanel questions={requirements.clarifyingQuestions} onAnswer={handleClarificationAnswer} />
-                <AssumptionsPanel assumptions={requirements.globalAssumptions} />
-                <CalculateEstimateButton
-                  loading={loading === 'estimate'}
-                  disabled={!hasEstimablePricing}
-                  onClick={handleEstimate}
-                />
-              </>
-            ) : (
-              <section className="rounded-lg border border-dashed border-line bg-panel p-8 text-center shadow-card">
-                <h2 className="text-lg font-semibold text-navy">Start by finding services</h2>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  Paste the requirement on the left, then click Find services. The app will show what can be priced and what needs more information.
-                </p>
-              </section>
-            )}
-            {estimate ? <EstimateSummary estimate={estimate} /> : null}
+        {workspaceTab === 'estimate' ? (
+          <div className="grid gap-6 lg:grid-cols-[430px_minmax(0,1fr)]">
+            <RequirementTextInput
+              value={requirementText}
+              loading={loading === 'extract'}
+              onChange={handleRequirementTextChange}
+              onExtract={handleExtract}
+              onRefine={refineRequirements}
+            />
+
+            <div className="space-y-5">
+              {error ? <ErrorAlert message={error} /> : null}
+              {loading ? <LoadingState /> : null}
+              {requirements ? (
+                <>
+                  <RequirementReview requirements={requirements} onComponentUpdate={handleComponentUpdate} />
+                  <ClarifyingQuestionsPanel questions={requirements.clarifyingQuestions} onAnswer={handleClarificationAnswer} />
+                  <AssumptionsPanel assumptions={requirements.globalAssumptions} />
+                  <CalculateEstimateButton
+                    loading={loading === 'estimate'}
+                    disabled={!hasEstimablePricing}
+                    onClick={handleEstimate}
+                  />
+                </>
+              ) : (
+                <section className="rounded-lg border border-dashed border-line bg-panel p-8 text-center shadow-card">
+                  <h2 className="text-lg font-semibold text-navy">Start by finding services</h2>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    Paste the requirement on the left, then click Find services. The app will show what can be priced and what needs more information.
+                  </p>
+                </section>
+              )}
+              {estimate ? <EstimateSummary estimate={estimate} /> : null}
+            </div>
           </div>
-        </div>
+        ) : null}
+
+        {workspaceTab === 'mapping' ? <ServiceMappingTab /> : null}
+        {workspaceTab === 'ai' ? <AiHelpTab requirements={requirements} estimate={estimate} /> : null}
       </div>
     </main>
   );
