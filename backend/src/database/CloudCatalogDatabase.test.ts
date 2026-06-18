@@ -142,4 +142,43 @@ describe('CloudCatalogDatabase', () => {
       retailPrice: 0.192
     });
   });
+
+  it('upserts AWS retail price meters for later catalog lookup', () => {
+    const catalog = createCatalog();
+
+    const rowsUpserted = catalog.upsertAwsRetailPriceMeters([
+      {
+        priceKey: 'AmazonEC2:us-east-1:SKU:TERM:RATE',
+        serviceName: 'AmazonEC2',
+        serviceFamily: 'Compute Instance',
+        productName: 'Compute Instance',
+        skuName: 'm7i.xlarge',
+        armSkuName: 'm7i.xlarge',
+        meterId: 'RATE',
+        meterName: '$0.2016 per On Demand Linux m7i.xlarge Instance Hour',
+        armRegionName: 'us-east-1',
+        location: 'US East (N. Virginia)',
+        unitOfMeasure: 'Hrs',
+        priceType: 'OnDemand',
+        currencyCode: 'USD',
+        retailPrice: 0.2016,
+        unitPrice: 0.2016,
+        tierMinimumUnits: 0,
+        raw: { sku: 'SKU' }
+      }
+    ]);
+
+    const meters = catalog.listRetailPriceMeters({ provider: 'aws', region: 'us-east-1', query: 'm7i.xlarge' });
+
+    expect(rowsUpserted).toBe(1);
+    expect(meters).toHaveLength(1);
+    expect(meters[0]).toMatchObject({
+      providerId: 'aws',
+      serviceName: 'AmazonEC2',
+      skuName: 'm7i.xlarge',
+      armSkuName: 'm7i.xlarge',
+      unitOfMeasure: 'Hrs',
+      unitPrice: 0.2016
+    });
+  });
 });

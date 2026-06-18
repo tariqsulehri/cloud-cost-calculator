@@ -8,7 +8,16 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "db:create": "tsx src/scripts/createPostgresDatabase.ts",
+    "db:migrate": "tsx src/scripts/migratePostgres.ts",
+    "db:seed:catalog": "tsx src/scripts/seedPostgresCatalog.ts",
     "catalog:sync:azure": "tsx src/scripts/syncAzureCatalog.ts",
+    "catalog:sync:azure:pg": "tsx src/scripts/syncAzureCatalogPostgres.ts",
+    "catalog:sync:azure:all": "tsx src/scripts/syncAzureSupportedCatalogsPostgres.ts",
+    "catalog:sync:aws:pg": "tsx src/scripts/syncAwsCatalogPostgres.ts",
+    "catalog:sync:aws:all": "tsx src/scripts/syncAwsSupportedCatalogsPostgres.ts",
+    "catalog:sync:gcp:pg": "tsx src/scripts/syncGcpCatalogPostgres.ts",
+    "catalog:sync:gcp:all": "tsx src/scripts/syncGcpSupportedCatalogsPostgres.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -18,6 +27,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "openai": "^6.39.0",
+    "pg": "^8.21.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -25,6 +35,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.5",
+    "@types/pg": "^8.20.0",
     "nock": "^13.5.6",
     "node-mocks-http": "^1.15.1",
     "tsx": "^4.19.2",

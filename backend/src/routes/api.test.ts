@@ -3,6 +3,7 @@ import nock from 'nock';
 import httpMocks from 'node-mocks-http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
+import { createCatalogRouter } from './catalog.routes.js';
 import { RequirementExtractionService } from '../services/RequirementExtractionService.js';
 import type { RequirementExtractor } from './requirements.routes.js';
 
@@ -125,6 +126,189 @@ describe('api routes', () => {
       pagesFetched: 1,
       itemsFetched: 1,
       rowsUpserted: 1
+    });
+  });
+
+  it('POST /api/catalog/sync/aws-public-prices starts an AWS public catalog sync', async () => {
+    const app = createApp({
+      catalogRouter: createCatalogRouter(undefined, undefined, {
+        async sync(options) {
+          return {
+            syncRunId: 7,
+            status: 'completed',
+            offerCode: options?.offerCode ?? 'AmazonEC2',
+            regionCode: options?.regionCode ?? 'us-east-1',
+            publicationDate: '2026-06-17T17:01:45Z',
+            rowsRead: 3,
+            rowsUpserted: 3
+          };
+        }
+      })
+    });
+    const req = httpMocks.createRequest({
+      method: 'POST',
+      url: '/api/catalog/sync/aws-public-prices',
+      body: {
+        offerCode: 'AmazonEC2',
+        regionCode: 'us-east-1',
+        maxMeters: 3
+      },
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const res = httpMocks.createResponse({ eventEmitter: EventEmitter });
+
+    await new Promise<void>((resolve) => {
+      res.on('end', resolve);
+      app.handle(req, res);
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res._getData())).toMatchObject({
+      status: 'completed',
+      offerCode: 'AmazonEC2',
+      regionCode: 'us-east-1',
+      rowsUpserted: 3
+    });
+  });
+
+  it('POST /api/catalog/sync/aws-public-prices/all starts all supported AWS public catalog syncs', async () => {
+    const app = createApp({
+      catalogRouter: createCatalogRouter(undefined, undefined, {
+        async sync() {
+          throw new Error('syncSupportedOffers should be used when available');
+        },
+        async syncSupportedOffers() {
+          return {
+            status: 'completed',
+            results: [
+              {
+                syncRunId: 8,
+                status: 'completed',
+                offerCode: 'AmazonEC2',
+                regionCode: 'us-east-1',
+                publicationDate: '2026-06-17T17:01:45Z',
+                rowsRead: 10,
+                rowsUpserted: 10
+              }
+            ]
+          };
+        }
+      })
+    });
+    const req = httpMocks.createRequest({
+      method: 'POST',
+      url: '/api/catalog/sync/aws-public-prices/all',
+      body: {},
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const res = httpMocks.createResponse({ eventEmitter: EventEmitter });
+
+    await new Promise<void>((resolve) => {
+      res.on('end', resolve);
+      app.handle(req, res);
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res._getData())).toMatchObject({
+      status: 'completed',
+      results: [expect.objectContaining({ offerCode: 'AmazonEC2', rowsUpserted: 10 })]
+    });
+  });
+
+  it('POST /api/catalog/sync/azure-retail-prices/all starts all supported Azure retail syncs', async () => {
+    const app = createApp({
+      catalogRouter: createCatalogRouter(undefined, undefined, undefined, {
+        async sync() {
+          throw new Error('syncSupportedServices should be used when available');
+        },
+        async syncSupportedServices() {
+          return {
+            status: 'completed',
+            results: [
+              {
+                syncRunId: 9,
+                status: 'completed',
+                serviceName: 'Virtual Machines',
+                armRegionName: 'eastus',
+                pagesFetched: 2,
+                itemsFetched: 1000,
+                rowsUpserted: 1000,
+                nextPageLink: null
+              }
+            ]
+          };
+        }
+      })
+    });
+    const req = httpMocks.createRequest({
+      method: 'POST',
+      url: '/api/catalog/sync/azure-retail-prices/all',
+      body: {},
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const res = httpMocks.createResponse({ eventEmitter: EventEmitter });
+
+    await new Promise<void>((resolve) => {
+      res.on('end', resolve);
+      app.handle(req, res);
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res._getData())).toMatchObject({
+      status: 'completed',
+      results: [expect.objectContaining({ serviceName: 'Virtual Machines', rowsUpserted: 1000 })]
+    });
+  });
+
+  it('POST /api/catalog/sync/gcp-public-prices/all starts all supported GCP public catalog syncs', async () => {
+    const app = createApp({
+      catalogRouter: createCatalogRouter(undefined, undefined, undefined, undefined, {
+        async sync() {
+          throw new Error('syncSupportedServices should be used when available');
+        },
+        async syncSupportedServices() {
+          return {
+            status: 'completed',
+            results: [
+              {
+                syncRunId: 10,
+                status: 'completed',
+                serviceName: 'Compute Engine',
+                serviceId: '6F81-5844-456A',
+                regionCode: 'us-east1',
+                skusRead: 20,
+                rowsUpserted: 40
+              }
+            ]
+          };
+        }
+      })
+    });
+    const req = httpMocks.createRequest({
+      method: 'POST',
+      url: '/api/catalog/sync/gcp-public-prices/all',
+      body: {},
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const res = httpMocks.createResponse({ eventEmitter: EventEmitter });
+
+    await new Promise<void>((resolve) => {
+      res.on('end', resolve);
+      app.handle(req, res);
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res._getData())).toMatchObject({
+      status: 'completed',
+      results: [expect.objectContaining({ serviceName: 'Compute Engine', rowsUpserted: 40 })]
     });
   });
 
@@ -329,7 +513,42 @@ describe('api routes', () => {
     expect(response.body.missingRequiredFieldLineItems.map((item: { type: string }) => item.type)).toEqual(['database', 'cache', 'load_balancer']);
   });
 
-  it('POST /api/estimate returns AWS early proposal pricing from mapped requirements', async () => {
+  it('POST /api/estimate returns AWS public EC2 pricing from mapped requirements', async () => {
+    nock('https://pricing.us-east-1.amazonaws.com')
+      .get('/offers/v1.0/aws/AmazonEC2/current/us-east-1/index.json')
+      .reply(200, {
+        products: {
+          EC2M7IXLARGE: {
+            sku: 'EC2M7IXLARGE',
+            productFamily: 'Compute Instance',
+            attributes: {
+              instanceType: 'm7i.xlarge',
+              operatingSystem: 'Linux',
+              tenancy: 'Shared',
+              preInstalledSw: 'NA',
+              capacitystatus: 'Used',
+              marketoption: 'OnDemand'
+            }
+          }
+        },
+        terms: {
+          OnDemand: {
+            EC2M7IXLARGE: {
+              'EC2M7IXLARGE.JRTCKXETXF': {
+                priceDimensions: {
+                  'EC2M7IXLARGE.JRTCKXETXF.6YS6EN2CT7': {
+                    unit: 'Hrs',
+                    description: '$0.2016 per On Demand Linux m7i.xlarge Instance Hour',
+                    pricePerUnit: {
+                      USD: '0.2016000000'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
     const extracted = await invoke('POST', '/api/requirements/extract', { requirementText: examplePrompt });
 
     const response = await invoke('POST', '/api/estimate', { provider: 'aws', requirements: extracted.body });
@@ -341,12 +560,14 @@ describe('api routes', () => {
       currency: 'USD'
     });
     expect(response.body.totalMonthlyCost).toBeGreaterThan(0);
-    expect(response.body.assumptions).toContain('AWS uses an early proposal rate card. It is not connected to live provider pricing APIs yet.');
+    expect(response.body.assumptions).toContain('AWS estimates use public on-demand price list data for exact EC2 Linux instance matches. Services without a public adapter still use the early proposal rate card.');
     expect(response.body.calculatedLineItems).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           category: 'Compute',
-          pricingSource: 'early-proposal-rate-card'
+          serviceName: 'EC2',
+          skuName: 'm7i.xlarge',
+          pricingSource: 'aws-public-price-list'
         }),
         expect.objectContaining({
           serviceName: 'Amazon CloudFront',
@@ -965,7 +1186,7 @@ All services should be deployed in Azure East US.`
             armRegionName: 'eastus',
             serviceName: 'Azure Database for PostgreSQL',
             serviceFamily: 'Databases',
-            productName: 'Azure Database for PostgreSQL Flexible Server General Purpose - Ddsv5 Series Compute',
+            productName: 'Azure Database for PostgreSQL Flexible Server General Purpose Ddsv5 Series Compute',
             skuName: '8 vCore',
             armSkuName: 'Standard_D8ds_v5',
             meterName: 'vCore',

@@ -16,8 +16,8 @@ const steps = [
 
 export function ProcessRail({ hasRequirements, hasEstimate }: ProcessRailProps) {
   return (
-    <Card className="flex h-full flex-col p-3.5">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <Card className="flex h-full flex-col p-3">
+      <div className="mb-2.5 flex items-center justify-between gap-3">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Workflow</div>
           <div className="text-[13px] font-bold text-navy">Requirement to estimate</div>
@@ -35,7 +35,7 @@ export function ProcessRail({ hasRequirements, hasEstimate }: ProcessRailProps) 
               key={step.key}
               title={step.text}
               className={cn(
-                'flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition',
+                'flex min-h-12 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition',
                 isActive
                   ? 'border-azure/30 bg-blue-50/70 shadow-sm'
                   : isDone
@@ -45,7 +45,7 @@ export function ProcessRail({ hasRequirements, hasEstimate }: ProcessRailProps) 
             >
               <span
                 className={cn(
-                  'flex h-8 w-8 flex-none items-center justify-center rounded-lg shadow-sm',
+                  'flex h-7 w-7 flex-none items-center justify-center rounded-lg shadow-sm',
                   isActive ? 'bg-brand-accent text-white shadow-glow' : isDone ? 'bg-success text-white' : 'bg-white text-slate-400 border border-line'
                 )}
               >
@@ -55,7 +55,7 @@ export function ProcessRail({ hasRequirements, hasEstimate }: ProcessRailProps) 
                 <div className="truncate text-[11px] font-bold text-navy">{step.title}</div>
                 <span
                   className={cn(
-                    'mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase',
+                    'mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none',
                     isActive ? 'bg-azure/10 text-azure' : isDone ? 'bg-success/10 text-success' : 'bg-white text-slate-500'
                   )}
                 >

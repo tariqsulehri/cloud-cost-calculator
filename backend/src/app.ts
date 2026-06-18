@@ -9,6 +9,7 @@ import { errorHandler } from './utils/errors.js';
 
 interface AppServices {
   requirementExtractionService?: RequirementExtractor;
+  catalogRouter?: express.Router;
 }
 
 export function createApp(services: AppServices = {}) {
@@ -34,7 +35,7 @@ export function createApp(services: AppServices = {}) {
 
   app.use('/api', healthRouter);
   app.use('/api', azureRouter);
-  app.use('/api', catalogRouter);
+  app.use('/api', services.catalogRouter ?? catalogRouter);
   app.use('/api', createRequirementsRouter(services.requirementExtractionService));
   app.use('/api', estimateRouter);
   app.use(errorHandler);

@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { cloudServiceSeeds } from './cloudServices.seed.js';
+import type { AwsRetailPriceMeterInput } from '../types/awsPriceList.types.js';
 import type { AzureRetailPriceItem } from '../types/azure.types.js';
 import type { NormalizedComponentType } from '../types/estimate.types.js';
 
@@ -114,13 +115,13 @@ interface CatalogServiceDbRow {
   notes: string | null;
 }
 
-const providers: Array<{ id: CloudProvider; name: string }> = [
+export const catalogProviders: Array<{ id: CloudProvider; name: string }> = [
   { id: 'azure', name: 'Microsoft Azure' },
   { id: 'aws', name: 'Amazon Web Services' },
   { id: 'gcp', name: 'Google Cloud Platform' }
 ];
 
-const seedServices: SeedService[] = [
+export const coreSeedServices: SeedService[] = [
   {
     serviceKey: 'compute',
     componentType: 'compute',
@@ -323,7 +324,7 @@ const seedServices: SeedService[] = [
   }
 ];
 
-const requiredFieldsByComponent: Partial<Record<NormalizedComponentType, string[]>> = {
+export const requiredFieldsByComponent: Partial<Record<NormalizedComponentType, string[]>> = {
   compute: ['quantity', 'vcpu', 'memoryGb', 'operatingSystem', 'imageType', 'monthlyHours'],
   kubernetes: ['nodeCount', 'vcpuPerNode', 'memoryGbPerNode', 'operatingSystem', 'imageType', 'monthlyHours'],
   database: ['engine', 'managed', 'vcpu', 'memoryGb', 'storageGb', 'storageType', 'highAvailability'],
@@ -473,6 +474,70 @@ export class CloudCatalogDatabase {
           unitPrice,
           item.tierMinimumUnits ?? 0,
           JSON.stringify(item)
+        );
+      });
+      this.connection.exec('commit');
+    } catch (error) {
+      this.connection.exec('rollback');
+      throw error;
+    }
+
+    return items.length;
+  }
+
+  upsertAwsRetailPriceMeters(items: AwsRetailPriceMeterInput[]): number {
+    if (items.length === 0) {
+      return 0;
+    }
+
+    const statement = this.connection.prepare(
+      `insert into retail_price_meters (
+         provider_id, price_key, service_name, service_family, product_name, sku_name,
+         arm_sku_name, meter_id, meter_name, arm_region_name, location, unit_of_measure,
+         price_type, currency_code, retail_price, unit_price, tier_minimum_units, raw_json, updated_at
+       )
+       values ('aws', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, current_timestamp)
+       on conflict(provider_id, price_key) do update set
+         service_name = excluded.service_name,
+         service_family = excluded.service_family,
+         product_name = excluded.product_name,
+         sku_name = excluded.sku_name,
+         arm_sku_name = excluded.arm_sku_name,
+         meter_id = excluded.meter_id,
+         meter_name = excluded.meter_name,
+         arm_region_name = excluded.arm_region_name,
+         location = excluded.location,
+         unit_of_measure = excluded.unit_of_measure,
+         price_type = excluded.price_type,
+         currency_code = excluded.currency_code,
+         retail_price = excluded.retail_price,
+         unit_price = excluded.unit_price,
+         tier_minimum_units = excluded.tier_minimum_units,
+         raw_json = excluded.raw_json,
+         updated_at = current_timestamp`
+    );
+
+    this.connection.exec('begin immediate transaction');
+    try {
+      items.forEach((item) => {
+        statement.run(
+          item.priceKey,
+          item.serviceName,
+          item.serviceFamily,
+          item.productName,
+          item.skuName,
+          item.armSkuName,
+          item.meterId,
+          item.meterName,
+          item.armRegionName,
+          item.location,
+          item.unitOfMeasure,
+          item.priceType,
+          item.currencyCode,
+          item.retailPrice,
+          item.unitPrice,
+          item.tierMinimumUnits,
+          JSON.stringify(item.raw)
         );
       });
       this.connection.exec('commit');
@@ -690,7 +755,7 @@ export class CloudCatalogDatabase {
        values (?, ?)
        on conflict(id) do update set name = excluded.name`
     );
-    providers.forEach((provider) => statement.run(provider.id, provider.name));
+    catalogProviders.forEach((provider) => statement.run(provider.id, provider.name));
   }
 
   private seedServices(): void {
@@ -719,10 +784,10 @@ export class CloudCatalogDatabase {
        on conflict(service_id, normalized_alias) do update set alias = excluded.alias`
     );
 
-    const allSeedServices = [...cloudServiceSeeds, ...seedServices];
+    const allSeedServices = [...cloudServiceSeeds, ...coreSeedServices];
 
     for (const service of allSeedServices) {
-      for (const provider of providers) {
+      for (const provider of catalogProviders) {
         const providerService = service.providers[provider.id];
         serviceStatement.run(
           service.serviceKey,
@@ -759,7 +824,7 @@ export class CloudCatalogDatabase {
        on conflict(provider_id, component_type, field_name) do update set priority = excluded.priority`
     );
 
-    for (const provider of providers) {
+    for (const provider of catalogProviders) {
       Object.entries(requiredFieldsByComponent).forEach(([componentType, fields]) => {
         fields?.forEach((field, index) => {
           statement.run(provider.id, componentType, field, index);

@@ -2,7 +2,18 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { createNaturalLanguageEstimate, extractRequirements, refineRequirements, searchCatalogServices } from './lib/api';
+import {
+  createNaturalLanguageEstimate,
+  extractRequirements,
+  getAwsCatalogSyncStatus,
+  getAzureCatalogSyncStatus,
+  getGcpCatalogSyncStatus,
+  refineRequirements,
+  searchCatalogServices,
+  syncAwsPublicPrices,
+  syncAzurePublicPrices,
+  syncGcpPublicPrices
+} from './lib/api';
 import type { CatalogService, NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement, Provider } from './types/estimate';
 
 vi.mock('./lib/api', () => ({
@@ -10,6 +21,12 @@ vi.mock('./lib/api', () => ({
   refineRequirements: vi.fn(),
   createNaturalLanguageEstimate: vi.fn(),
   searchCatalogServices: vi.fn(),
+  getAwsCatalogSyncStatus: vi.fn(),
+  syncAwsPublicPrices: vi.fn(),
+  getAzureCatalogSyncStatus: vi.fn(),
+  syncAzurePublicPrices: vi.fn(),
+  getGcpCatalogSyncStatus: vi.fn(),
+  syncGcpPublicPrices: vi.fn(),
   getApiErrorMessage: vi.fn(() => 'Request failed')
 }));
 
@@ -428,6 +445,118 @@ describe('App', () => {
     vi.mocked(extractRequirements).mockResolvedValue(extractedRequirements);
     vi.mocked(refineRequirements).mockImplementation(async (value: string) => value);
     vi.mocked(createNaturalLanguageEstimate).mockImplementation(async (payload) => estimateForProvider(payload.provider));
+    vi.mocked(getAwsCatalogSyncStatus).mockResolvedValue({
+      services: [
+        {
+          offerCode: 'AmazonEC2',
+          regionCode: 'us-east-1',
+          meterCount: 118741,
+          latestRun: {
+            id: 1,
+            providerId: 'aws',
+            source: 'aws-public-price-list',
+            serviceCode: 'AmazonEC2',
+            regionCode: 'us-east-1',
+            status: 'completed',
+            startedAt: '2026-06-18T08:00:00.000Z',
+            completedAt: '2026-06-18T08:01:00.000Z',
+            rowsRead: 118741,
+            rowsUpserted: 118741,
+            errorMessage: null,
+            metadata: {}
+          }
+        }
+      ]
+    });
+    vi.mocked(syncAwsPublicPrices).mockResolvedValue({
+      status: 'completed',
+      results: [
+        {
+          syncRunId: 2,
+          status: 'completed',
+          offerCode: 'AmazonEC2',
+          regionCode: 'us-east-1',
+          publicationDate: '2026-06-17T17:01:45Z',
+          rowsRead: 118741,
+          rowsUpserted: 118741
+        }
+      ]
+    });
+    vi.mocked(getAzureCatalogSyncStatus).mockResolvedValue({
+      services: [
+        {
+          serviceName: 'Virtual Machines',
+          armRegionName: 'eastus',
+          meterCount: 1234,
+          latestRun: {
+            id: 3,
+            providerId: 'azure',
+            source: 'azure-retail-prices-api',
+            serviceCode: 'Virtual Machines',
+            regionCode: 'eastus',
+            status: 'completed',
+            startedAt: '2026-06-18T08:05:00.000Z',
+            completedAt: '2026-06-18T08:06:00.000Z',
+            rowsRead: 1234,
+            rowsUpserted: 1234,
+            errorMessage: null,
+            metadata: {}
+          }
+        }
+      ]
+    });
+    vi.mocked(syncAzurePublicPrices).mockResolvedValue({
+      status: 'completed',
+      results: [
+        {
+          syncRunId: 4,
+          status: 'completed',
+          serviceName: 'Virtual Machines',
+          armRegionName: 'eastus',
+          pagesFetched: 2,
+          itemsFetched: 1234,
+          rowsUpserted: 1234,
+          nextPageLink: null
+        }
+      ]
+    });
+    vi.mocked(getGcpCatalogSyncStatus).mockResolvedValue({
+      services: [
+        {
+          serviceName: 'Compute Engine',
+          regionCode: 'us-east1',
+          meterCount: 4321,
+          latestRun: {
+            id: 5,
+            providerId: 'gcp',
+            source: 'gcp-cloud-billing-pricing-api',
+            serviceCode: 'Compute Engine',
+            regionCode: 'us-east1',
+            status: 'completed',
+            startedAt: '2026-06-18T08:07:00.000Z',
+            completedAt: '2026-06-18T08:08:00.000Z',
+            rowsRead: 4321,
+            rowsUpserted: 4321,
+            errorMessage: null,
+            metadata: {}
+          }
+        }
+      ]
+    });
+    vi.mocked(syncGcpPublicPrices).mockResolvedValue({
+      status: 'completed',
+      results: [
+        {
+          syncRunId: 6,
+          status: 'completed',
+          serviceName: 'Compute Engine',
+          serviceId: 'compute-engine',
+          regionCode: 'us-east1',
+          skusRead: 400,
+          rowsUpserted: 4321
+        }
+      ]
+    });
     vi.mocked(searchCatalogServices).mockImplementation(async (query = '', options = {}) => {
       const normalizedQuery = query.toLowerCase();
       return mappedCatalogServices.filter((service) => {
@@ -458,6 +587,30 @@ describe('App', () => {
 
     expect(screen.getByRole('button', { name: 'Find services' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Improve text' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Magic Requirement Builder' })).toBeInTheDocument();
+  });
+
+  it('creates a professional prompt from selected catalog services', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Magic Requirement Builder' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Magic requirement builder' });
+
+    await userEvent.click(await within(dialog).findByRole('option', { name: /Azure Cache for Redis/ }));
+    expect(within(dialog).getByText('Generated prompt')).toBeInTheDocument();
+    expect(within(dialog).getByDisplayValue(/Azure Cache for Redis/)).toBeInTheDocument();
+    expect((within(dialog).getByLabelText(/Memory \(GB\)/) as HTMLInputElement).type).toBe('number');
+    expect(within(dialog).getByDisplayValue('Redis')).toBeInTheDocument();
+    expect(within(dialog).getByDisplayValue(/Which cache engine\?: Redis/)).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Use prompt' }));
+
+    const requirementTextarea = screen.getByLabelText('Requirement text') as HTMLTextAreaElement;
+    expect(requirementTextarea.value).toContain('I need a monthly cloud cost estimate for Azure in East US.');
+    expect(requirementTextarea.value).toContain('Environment: Production.');
+    expect(requirementTextarea.value).toContain('Pricing model: Pay-as-you-go / on-demand.');
+    expect(requirementTextarea.value).toContain('Azure Cache for Redis');
+    expect(requirementTextarea.value).toContain('Which cache engine?: Redis');
   });
 
   it('shows service mapping tab with cloud equivalents', async () => {
@@ -480,6 +633,38 @@ describe('App', () => {
 
     expect(screen.getByText('Ask about the estimate')).toBeInTheDocument();
     expect(screen.getByText(/Full AI chat can be connected later/)).toBeInTheDocument();
+  });
+
+  it('shows public price sync operations for AWS, Azure, and GCP', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('tab', { name: /Operations/i }));
+
+    expect(await screen.findByText('Cloud Public Price Catalog')).toBeInTheDocument();
+    expect(screen.getAllByText('118,741').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('1,234').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('4,321').length).toBeGreaterThan(0);
+
+    await userEvent.click(screen.getByRole('button', { name: /Sync AWS prices/i }));
+    await waitFor(() => expect(syncAwsPublicPrices).toHaveBeenCalled());
+
+    await userEvent.click(screen.getByRole('button', { name: /Sync Azure prices/i }));
+    await waitFor(() => expect(syncAzurePublicPrices).toHaveBeenCalled());
+
+    await userEvent.click(screen.getByRole('button', { name: /Sync GCP prices/i }));
+    await waitFor(() => expect(syncGcpPublicPrices).toHaveBeenCalled());
+  });
+
+  it('shows documentation guide by section', async () => {
+    render(<App />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Open documentation guide' }));
+
+    expect(screen.getByText('Guidelines and operations')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Badge And Sign Meanings/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Badge And Sign Meanings/ }));
+    expect(screen.getByText('Service Review Badges')).toBeInTheDocument();
+    expect(screen.getByText('Pricing Source And System Messages')).toBeInTheDocument();
   });
 
   it('shows a refined prompt below and lets the user use it for extraction', async () => {

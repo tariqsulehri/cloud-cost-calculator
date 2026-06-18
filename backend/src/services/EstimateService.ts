@@ -67,7 +67,7 @@ export class EstimateService {
 
   async estimateNormalized(request: NormalizedEstimateRequest): Promise<NormalizedEstimateResponse> {
     if (request.provider !== 'azure') {
-      return this.preliminaryCloudPricingService.estimateNormalized(request);
+      return await this.preliminaryCloudPricingService.estimateNormalized(request);
     }
 
     const region = request.requirements.region.providerRegion.azure;
@@ -395,14 +395,73 @@ export class EstimateService {
         }
 
         if (!isApplicationGateway) {
-          notImplementedLineItems.push({
-            componentId: component.id,
-            type: component.type,
-            serviceName: this.displayServiceName(component),
-            reason: 'Azure Load Balancer pricing adapter is not implemented yet; HTTP/S Application Gateway pricing is supported.',
-            assumptions: component.assumptions,
-            rawText: component.rawText
+          const loadBalancerPrice = await this.azurePricingService.getLoadBalancerStandardIncludedRulePrice();
+          const dataProcessedGb =
+            this.numberValue(component as unknown as GenericComponent, 'dataProcessedGb') ??
+            this.numberValue(component as unknown as GenericComponent, 'monthlyDataProcessedGb') ??
+            this.numberValue(component as unknown as GenericComponent, 'dataTransferGb') ??
+            this.numberValue(component as unknown as GenericComponent, 'monthlyTransferGb');
+          const dataProcessedPrice = dataProcessedGb ? await this.azurePricingService.getLoadBalancerStandardDataProcessedPrice() : null;
+
+          if (loadBalancerPrice.pricingSource === 'fallback') {
+            unsupportedLineItems.push(this.toUnpricedLineItem(component, loadBalancerPrice.assumption));
+            continue;
+          }
+          if (dataProcessedPrice?.pricingSource === 'fallback') {
+            unsupportedLineItems.push(this.toUnpricedLineItem(component, dataProcessedPrice.assumption));
+            continue;
+          }
+
+          const hours = this.numberValue(component as unknown as GenericComponent, 'monthlyHours') ?? 730;
+          const ruleCount = this.numberValue(component as unknown as GenericComponent, 'ruleCount') ?? this.numberValue(component as unknown as GenericComponent, 'loadBalancerRuleCount') ?? 1;
+          const loadBalancerAssumption =
+            dataProcessedGb
+              ? 'Azure Load Balancer estimate defaults TCP/network load balancer to Standard included LB/outbound rules and prices supplied processed GB. Extra rules beyond included allowance, public IP, NAT Gateway, and cross-region/global load balancer charges are excluded unless separately detected.'
+              : 'Azure Load Balancer estimate defaults TCP/network load balancer to Standard included LB/outbound rules. Data processed is excluded because processed GB was not supplied; extra rules beyond included allowance, public IP, NAT Gateway, and cross-region/global load balancer charges are also excluded unless separately detected.';
+
+          calculatedLineItems.push({
+            category: 'Networking',
+            serviceName: loadBalancerPrice.serviceName,
+            skuName: loadBalancerPrice.skuName,
+            meterName: loadBalancerPrice.meterName,
+            quantity: ruleCount,
+            hours,
+            usageLabel: `${ruleCount} rule(s) x ${hours} hours`,
+            unit: loadBalancerPrice.unit,
+            unitPrice: loadBalancerPrice.unitPrice,
+            monthlyCost: roundMoney(loadBalancerPrice.unitPrice * ruleCount * hours),
+            assumption: `${loadBalancerPrice.assumption} ${loadBalancerAssumption} Calculation is ${ruleCount} rule(s) x ${hours} hour(s) x hourly rule price.`,
+            pricingSource: loadBalancerPrice.pricingSource,
+            confidence: loadBalancerPrice.confidence,
+            rawProductName: loadBalancerPrice.rawProductName,
+            rawSkuName: loadBalancerPrice.rawSkuName,
+            rawMeterName: loadBalancerPrice.rawMeterName,
+            rawArmRegionName: loadBalancerPrice.rawArmRegionName
           });
+
+          if (dataProcessedGb && dataProcessedPrice) {
+            calculatedLineItems.push({
+              category: 'Networking',
+              serviceName: dataProcessedPrice.serviceName,
+              skuName: dataProcessedPrice.skuName,
+              meterName: dataProcessedPrice.meterName,
+              quantity: dataProcessedGb,
+              hours: 1,
+              usageLabel: `${this.formatUsage(dataProcessedGb)} GB processed`,
+              unit: dataProcessedPrice.unit,
+              unitPrice: dataProcessedPrice.unitPrice,
+              monthlyCost: roundMoney(dataProcessedPrice.unitPrice * dataProcessedGb),
+              assumption: `${dataProcessedPrice.assumption} ${loadBalancerAssumption} Calculation is ${this.formatUsage(dataProcessedGb)} GB x public data processed price.`,
+              pricingSource: dataProcessedPrice.pricingSource,
+              confidence: dataProcessedPrice.confidence,
+              rawProductName: dataProcessedPrice.rawProductName,
+              rawSkuName: dataProcessedPrice.rawSkuName,
+              rawMeterName: dataProcessedPrice.rawMeterName,
+              rawArmRegionName: dataProcessedPrice.rawArmRegionName
+            });
+          }
+          pricedComponentIds.add(component.id);
+          assumptions.push(loadBalancerAssumption);
           continue;
         }
 

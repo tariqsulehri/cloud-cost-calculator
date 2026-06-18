@@ -1,23 +1,31 @@
 import axios, { type AxiosInstance } from 'axios';
+import { PostgresPricingCatalogRepository, type RetailPriceMeterListFilters } from '../database/PostgresPricingCatalogRepository.js';
 import { MemoryCache } from '../utils/cache.js';
 import type { AzurePriceRecord, AzureRetailPriceFilters, AzureRetailPriceItem, AzureRetailPriceResponse } from '../types/azure.types.js';
+import type { RetailPriceMeter } from '../database/CloudCatalogDatabase.js';
 
 const DEFAULT_API_URL = 'https://prices.azure.com/api/retail/prices';
 const DEFAULT_API_VERSION = '2023-01-01-preview';
 const DEFAULT_CURRENCY = 'USD';
 
+interface LocalAzurePriceCatalog {
+  listRetailPriceMeters(filters?: RetailPriceMeterListFilters): Promise<RetailPriceMeter[]>;
+}
+
 export class PricingCatalogService {
   private readonly cache: MemoryCache<AzurePriceRecord[]>;
   private readonly apiUrl: string;
   private readonly apiVersion: string;
+  private readonly localCatalog: LocalAzurePriceCatalog | null;
 
   constructor(
     private readonly http: AxiosInstance = axios.create({ timeout: 4500 }),
-    options: { apiUrl?: string; apiVersion?: string; cacheTtlMs?: number } = {}
+    options: { apiUrl?: string; apiVersion?: string; cacheTtlMs?: number; localCatalog?: LocalAzurePriceCatalog; enableLocalCatalog?: boolean } = {}
   ) {
     this.apiUrl = options.apiUrl ?? process.env.AZURE_RETAIL_PRICES_API_URL ?? DEFAULT_API_URL;
     this.apiVersion = options.apiVersion ?? process.env.AZURE_RETAIL_PRICES_API_VERSION ?? DEFAULT_API_VERSION;
     this.cache = new MemoryCache<AzurePriceRecord[]>(options.cacheTtlMs ?? 1000 * 60 * 60 * 24);
+    this.localCatalog = this.resolveLocalCatalog(options);
   }
 
   async findPrices(filters: AzureRetailPriceFilters): Promise<AzurePriceRecord[]> {
@@ -25,6 +33,12 @@ export class PricingCatalogService {
     const cached = this.cache.get(url);
     if (cached) {
       return cached;
+    }
+
+    const localRecords = await this.findLocalPrices(filters);
+    if (localRecords && localRecords.length > 0) {
+      this.cache.set(url, localRecords);
+      return localRecords;
     }
 
     const items: AzureRetailPriceItem[] = [];
@@ -106,6 +120,85 @@ export class PricingCatalogService {
       retailPrice: price,
       unitPrice: item.unitPrice ?? price,
       raw: item
+    };
+  }
+
+  private resolveLocalCatalog(options: { localCatalog?: LocalAzurePriceCatalog; enableLocalCatalog?: boolean }): LocalAzurePriceCatalog | null {
+    if (options.localCatalog) {
+      return options.localCatalog;
+    }
+
+    const enabled =
+      options.enableLocalCatalog ??
+      (process.env.NODE_ENV !== 'test' && process.env.AZURE_PRICING_USE_POSTGRES !== 'false' && Boolean(process.env.DATABASE_URL));
+
+    return enabled ? new PostgresPricingCatalogRepository() : null;
+  }
+
+  private async findLocalPrices(filters: AzureRetailPriceFilters): Promise<AzurePriceRecord[] | null> {
+    if (!this.localCatalog) {
+      return null;
+    }
+
+    try {
+      const meters = await this.localCatalog.listRetailPriceMeters({
+        provider: 'azure',
+        serviceName: filters.serviceName,
+        region: filters.armRegionName,
+        productName: filters.productName,
+        skuName: filters.skuName,
+        armSkuName: filters.armSkuName,
+        meterName: filters.meterName,
+        priceType: filters.priceType,
+        currencyCode: filters.currencyCode ?? DEFAULT_CURRENCY,
+        limit: 5000
+      });
+
+      return meters.map((meter) => this.normalizeLocalPriceRecord(meter));
+    } catch (error) {
+      console.warn(`Local Azure pricing catalog lookup failed; falling back to Azure Retail Prices API. ${this.errorSummary(error)}`);
+      return null;
+    }
+  }
+
+  private normalizeLocalPriceRecord(meter: RetailPriceMeter): AzurePriceRecord {
+    const raw: AzureRetailPriceItem = {
+      currencyCode: meter.currencyCode,
+      tierMinimumUnits: meter.tierMinimumUnits,
+      armRegionName: meter.armRegionName ?? undefined,
+      location: meter.location ?? undefined,
+      meterId: meter.meterId ?? undefined,
+      meterName: meter.meterName,
+      productName: meter.productName,
+      skuName: meter.skuName,
+      serviceName: meter.serviceName,
+      serviceFamily: meter.serviceFamily ?? undefined,
+      unitOfMeasure: meter.unitOfMeasure,
+      type: meter.priceType ?? undefined,
+      priceType: meter.priceType ?? undefined,
+      armSkuName: meter.armSkuName ?? undefined,
+      retailPrice: meter.retailPrice,
+      unitPrice: meter.unitPrice
+    };
+
+    return {
+      currencyCode: meter.currencyCode,
+      tierMinimumUnits: meter.tierMinimumUnits,
+      armRegionName: meter.armRegionName,
+      location: meter.location,
+      meterId: meter.meterId,
+      meterName: meter.meterName,
+      productName: meter.productName,
+      skuName: meter.skuName,
+      serviceName: meter.serviceName,
+      serviceFamily: meter.serviceFamily,
+      unitOfMeasure: meter.unitOfMeasure,
+      type: meter.priceType,
+      priceType: meter.priceType,
+      armSkuName: meter.armSkuName,
+      retailPrice: meter.retailPrice,
+      unitPrice: meter.unitPrice,
+      raw
     };
   }
 

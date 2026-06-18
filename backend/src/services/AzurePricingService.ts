@@ -311,6 +311,64 @@ export class AzurePricingService {
     });
   }
 
+  async getLoadBalancerStandardIncludedRulePrice(): Promise<AzureMeterPriceResult> {
+    const records = await this.findExactMeter({
+      region: 'Global',
+      serviceName: 'Load Balancer',
+      productName: 'Load Balancer',
+      skuName: 'Standard',
+      meterName: 'Standard Included LB Rules and Outbound Rules',
+      unitOfMeasure: '1 Hour'
+    });
+
+    if (records.length === 0) {
+      return this.meterFallback(
+        'Azure Load Balancer',
+        'Standard',
+        'Standard Included LB Rules and Outbound Rules',
+        '1 Hour',
+        'Azure Retail Prices API did not return Standard Load Balancer included rule hourly pricing.'
+      );
+    }
+
+    return this.toMeterPriceResult({
+      serviceName: 'Azure Load Balancer',
+      skuName: 'Standard',
+      meterName: 'Standard Included LB Rules and Outbound Rules',
+      records,
+      assumption: 'Matched Azure Retail Prices API Standard Load Balancer included rule hourly meter.'
+    });
+  }
+
+  async getLoadBalancerStandardDataProcessedPrice(): Promise<AzureMeterPriceResult> {
+    const records = await this.findExactMeter({
+      region: 'Global',
+      serviceName: 'Load Balancer',
+      productName: 'Load Balancer',
+      skuName: 'Standard',
+      meterName: 'Standard Data Processed',
+      unitOfMeasure: '1 GB'
+    });
+
+    if (records.length === 0) {
+      return this.meterFallback(
+        'Azure Load Balancer',
+        'Standard',
+        'Standard Data Processed',
+        '1 GB',
+        'Azure Retail Prices API did not return Standard Load Balancer data processed pricing.'
+      );
+    }
+
+    return this.toMeterPriceResult({
+      serviceName: 'Azure Load Balancer',
+      skuName: 'Standard',
+      meterName: 'Standard Data Processed',
+      records,
+      assumption: 'Matched Azure Retail Prices API Standard Load Balancer data processed meter.'
+    });
+  }
+
   async getServiceBusBasePrice(input: { region: string; tier: string }): Promise<AzureMeterPriceResult> {
     const tier = this.titleCase(input.tier);
     const meterName = tier === 'Premium' ? 'Premium Messaging Unit' : `${tier} Base Unit`;
@@ -446,7 +504,7 @@ export class AzurePricingService {
     const records = await this.findExactMeter({
       region: input.region,
       serviceName: 'Azure Database for PostgreSQL',
-      productName: 'Azure Database for PostgreSQL Flexible Server General Purpose - Ddsv5 Series Compute',
+      productName: 'Azure Database for PostgreSQL Flexible Server General Purpose Ddsv5 Series Compute',
       skuName,
       meterName: 'vCore',
       unitOfMeasure: '1 Hour',

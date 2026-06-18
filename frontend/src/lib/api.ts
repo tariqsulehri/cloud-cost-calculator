@@ -1,9 +1,15 @@
 import axios from 'axios';
 import type {
   AzureRegion,
+  AzureCatalogSyncAllResult,
+  AzureCatalogSyncStatus,
+  AwsCatalogSyncAllResult,
+  AwsCatalogSyncStatus,
   CatalogService,
   EstimateRequest,
   EstimateResponse,
+  GcpCatalogSyncAllResult,
+  GcpCatalogSyncStatus,
   NaturalLanguageEstimateResponse,
   NormalizedEstimateRequest,
   NormalizedInfrastructureRequirement,
@@ -58,6 +64,36 @@ export async function searchCatalogServices(
     params: Object.keys(params).length > 0 ? params : undefined
   });
   return response.data.services;
+}
+
+export async function getAwsCatalogSyncStatus(): Promise<AwsCatalogSyncStatus> {
+  const response = await api.get<AwsCatalogSyncStatus>('/catalog/sync/aws-public-prices/status');
+  return response.data;
+}
+
+export async function syncAwsPublicPrices(): Promise<AwsCatalogSyncAllResult> {
+  const response = await api.post<AwsCatalogSyncAllResult>('/catalog/sync/aws-public-prices/all', {}, { timeout: 300000 });
+  return response.data;
+}
+
+export async function getAzureCatalogSyncStatus(): Promise<AzureCatalogSyncStatus> {
+  const response = await api.get<AzureCatalogSyncStatus>('/catalog/sync/azure-retail-prices/status');
+  return response.data;
+}
+
+export async function syncAzurePublicPrices(): Promise<AzureCatalogSyncAllResult> {
+  const response = await api.post<AzureCatalogSyncAllResult>('/catalog/sync/azure-retail-prices/all', {}, { timeout: 300000 });
+  return response.data;
+}
+
+export async function getGcpCatalogSyncStatus(): Promise<GcpCatalogSyncStatus> {
+  const response = await api.get<GcpCatalogSyncStatus>('/catalog/sync/gcp-public-prices/status');
+  return response.data;
+}
+
+export async function syncGcpPublicPrices(): Promise<GcpCatalogSyncAllResult> {
+  const response = await api.post<GcpCatalogSyncAllResult>('/catalog/sync/gcp-public-prices/all', {}, { timeout: 300000 });
+  return response.data;
 }
 
 export function getApiErrorMessage(error: unknown): string {

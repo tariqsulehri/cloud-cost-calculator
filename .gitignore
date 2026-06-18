@@ -27,3 +27,6 @@ pnpm-debug.log*
 *.db
 *.sqlite-wal
 *.sqlite-shm
+
+# Downloaded public cloud price-list dumps
+data/aws-prices*.json

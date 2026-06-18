@@ -1,4 +1,4 @@
-import { CheckCircle2, FileText, Search, Sparkles } from 'lucide-react';
+import { CheckCircle2, FileText, Search, Sparkles, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Provider } from '../types/estimate';
 
@@ -9,9 +9,10 @@ interface RequirementTextInputProps {
   onChange: (value: string) => void;
   onExtract: () => void;
   onRefine: (value: string, provider: Provider) => Promise<string>;
+  onOpenMagicPrompt: () => void;
 }
 
-export function RequirementTextInput({ value, loading, provider, onChange, onExtract, onRefine }: RequirementTextInputProps) {
+export function RequirementTextInput({ value, loading, provider, onChange, onExtract, onRefine, onOpenMagicPrompt }: RequirementTextInputProps) {
   const [showRefinedPrompt, setShowRefinedPrompt] = useState(false);
   const [refinedPrompt, setRefinedPrompt] = useState('');
   const [refining, setRefining] = useState(false);
@@ -49,6 +50,14 @@ export function RequirementTextInput({ value, loading, provider, onChange, onExt
         />
       </label>
       <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onOpenMagicPrompt}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-violet/30 bg-violet/10 px-3.5 text-xs font-semibold text-violet transition hover:border-violet/50 hover:bg-violet/15"
+        >
+          <Wand2 className="h-4 w-4" aria-hidden="true" />
+          Magic Requirement Builder
+        </button>
         <button
           type="button"
           onClick={handleReviewRefine}

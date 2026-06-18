@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CircleDollarSign, Download, FileText, GitCompareArrows, Maximize2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDollarSign, Cloud, CloudCog, Download, FileText, GitCompareArrows, Maximize2, X } from 'lucide-react';
 import { useState } from 'react';
 import { coverageBadgeClass } from '../lib/coverageBadge';
 import { formatCurrency, pricingSourceClass, pricingSourceDescription, pricingSourceLabel } from '../lib/format';
@@ -17,6 +17,43 @@ const providerNotes: Record<Provider, string> = {
   gcp: 'Early proposal rate card'
 };
 
+const providerTheme: Record<
+  Provider,
+  {
+    card: string;
+    icon: typeof Cloud;
+    logoSrc: string;
+    iconBox: string;
+    accent: string;
+    summary: string;
+  }
+> = {
+  azure: {
+    card: 'border-blue-300 bg-blue-50/45',
+    icon: CloudCog,
+    logoSrc: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/azure/azure-original.svg',
+    iconBox: 'bg-blue-700 text-white shadow-glow',
+    accent: 'bg-blue-700',
+    summary: 'border-blue-200 bg-white/80'
+  },
+  aws: {
+    card: 'border-amber-300 bg-amber-50/45',
+    icon: Cloud,
+    logoSrc: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg',
+    iconBox: 'bg-amber-100 text-amber-700',
+    accent: 'bg-amber-500',
+    summary: 'border-amber-200 bg-white/80'
+  },
+  gcp: {
+    card: 'border-emerald-300 bg-emerald-50/45',
+    icon: Cloud,
+    logoSrc: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/googlecloud/googlecloud-original.svg',
+    iconBox: 'bg-emerald-100 text-emerald-700',
+    accent: 'bg-emerald-600',
+    summary: 'border-emerald-200 bg-white/80'
+  }
+};
+
 interface CompareEstimatesProps {
   estimates: Partial<Record<Provider, NaturalLanguageEstimateResponse>>;
 }
@@ -25,6 +62,7 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
   const [showRoughGuidance, setShowRoughGuidance] = useState(false);
   const [showGuidanceInCostTable, setShowGuidanceInCostTable] = useState(false);
   const [showLandscapeTable, setShowLandscapeTable] = useState(false);
+  const [showNotCalculated, setShowNotCalculated] = useState(true);
   const providers: Provider[] = ['azure', 'aws', 'gcp'];
   const available = providers.filter((provider) => estimates[provider]);
   const calculatedRows = available.flatMap((provider) =>
@@ -135,13 +173,23 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
           const excludedCount = estimate
             ? estimate.notImplementedLineItems.length + estimate.unsupportedLineItems.length + estimate.missingRequiredFieldLineItems.length
             : 0;
+          const theme = providerTheme[provider];
 
           return (
-            <article key={provider} className="rounded-lg border border-line bg-white p-3.5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-navy">{providerLabels[provider]}</h3>
-                  <p className="mt-0.5 text-[11px] leading-4 text-muted">{providerNotes[provider]}</p>
+            <article key={provider} className={`overflow-hidden rounded-lg border p-3.5 shadow-sm ${theme.card}`}>
+              <div className={`-mx-3.5 -mt-3.5 mb-3 h-1 ${theme.accent}`} />
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg ${theme.iconBox}`}>
+                    <img src={theme.logoSrc} alt="" className="h-5 w-5 object-contain" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h3 className="text-sm font-bold text-navy">{providerLabels[provider]}</h3>
+                      {estimate ? <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${coverageBadgeClass(coveragePercent)}`}>{coveragePercent}% priced</span> : null}
+                    </div>
+                    <p className="mt-0.5 text-[11px] leading-4 text-slate-600">{providerNotes[provider]}</p>
+                  </div>
                 </div>
                 {quality?.status === 'complete' ? (
                   <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
@@ -152,10 +200,18 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
 
               {estimate ? (
                 <>
-                  <div className="mt-3 flex items-end justify-between gap-3">
-                    <div className="text-2xl font-extrabold text-navy">{formatCurrency(estimate.totalMonthlyCost, estimate.currency)}</div>
-                    <div className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${coverageBadgeClass(coveragePercent)}`}>
-                      {coveragePercent}% priced
+                  <div className={`mt-3 rounded-lg border px-3 py-2.5 ${theme.summary}`}>
+                    <div className="text-[10px] font-bold uppercase text-slate-500">Calculated total</div>
+                    <div className="mt-0.5 text-2xl font-extrabold text-navy">{formatCurrency(estimate.totalMonthlyCost, estimate.currency)}</div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <div className="font-bold text-navy">{quality?.pricedComponentCount ?? 0}/{quality?.totalComponentCount ?? 0}</div>
+                        <div className="text-muted">priced</div>
+                      </div>
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <div className="font-bold text-navy">{excludedCount}</div>
+                        <div className="text-muted">excluded</div>
+                      </div>
                     </div>
                   </div>
                   {planningTotal ? (
@@ -167,16 +223,6 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
                       <div className="mt-0.5">Includes {planningTotal.itemCount} approximate item(s). Official total above is unchanged.</div>
                     </div>
                   ) : null}
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="rounded-lg bg-slate-50 px-2.5 py-2">
-                      <div className="font-bold text-navy">{quality?.pricedComponentCount ?? 0}/{quality?.totalComponentCount ?? 0}</div>
-                      <div className="text-muted">services priced</div>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 px-2.5 py-2">
-                      <div className="font-bold text-navy">{excludedCount}</div>
-                      <div className="text-muted">excluded</div>
-                    </div>
-                  </div>
                   <p className="mt-3 text-[11px] leading-4 text-slate-600">{quality?.summary}</p>
                 </>
               ) : (
@@ -198,7 +244,7 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
             </div>
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+          <div className="grid gap-4">
             <div className="overflow-hidden rounded-lg border border-line bg-white">
               <div className="border-b border-lineSoft bg-slate-50 px-3.5 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -211,7 +257,7 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
                       type="button"
                       onClick={() => setShowLandscapeTable(true)}
                       disabled={detailedCostRows.length === 0}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 text-[11px] font-bold text-graphite transition hover:border-violet/30 hover:text-violet disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-blue-700 bg-blue-700 px-2.5 text-[11px] font-bold text-white shadow-sm transition hover:border-blue-800 hover:bg-blue-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                     >
                       <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
                       View landscape
@@ -220,7 +266,7 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
                       type="button"
                       onClick={() => exportExcelFile(detailedCostRows)}
                       disabled={detailedCostRows.length === 0}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 text-[11px] font-bold text-graphite transition hover:border-teal/30 hover:text-teal disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-600 px-2.5 text-[11px] font-bold text-white shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                     >
                       <Download className="h-3.5 w-3.5" aria-hidden="true" />
                       Export Excel
@@ -229,7 +275,7 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
                       type="button"
                       onClick={() => exportPdfView(detailedCostRows)}
                       disabled={detailedCostRows.length === 0}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 text-[11px] font-bold text-graphite transition hover:border-danger/30 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-600 bg-red-600 px-2.5 text-[11px] font-bold text-white shadow-sm transition hover:border-red-700 hover:bg-red-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                     >
                       <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                       Export PDF
@@ -246,12 +292,31 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
               )}
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-line bg-white">
-              <div className="border-b border-lineSoft bg-slate-50 px-3.5 py-3">
+            <div className="overflow-hidden rounded-lg border border-red-200 bg-red-50/40">
+              <button
+                type="button"
+                onClick={() => setShowNotCalculated((value) => !value)}
+                className="flex w-full flex-wrap items-center justify-between gap-3 border-b border-red-200 bg-red-50 px-3.5 py-3 text-left transition hover:bg-red-100"
+                aria-expanded={showNotCalculated}
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-red-900">Not calculated</h3>
+                    <span className={excludedRows.length > 0 ? 'rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700' : 'rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700'}>
+                      {excludedRows.length}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-red-700">{showNotCalculated ? 'Hide services excluded from totals.' : 'Show services excluded from totals.'}</p>
+                </div>
+                <span className="text-lg font-bold text-red-700">{showNotCalculated ? '−' : '+'}</span>
+              </button>
+              {showNotCalculated ? (
+                <>
+              <div className="border-b border-red-100 bg-white px-3.5 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-navy">Not calculated</h3>
-                    <p className="mt-0.5 text-[11px] text-muted">These services are excluded from totals.</p>
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-red-900">Review excluded services</h4>
+                    <p className="mt-0.5 text-[11px] text-red-700">These services are excluded from totals.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <label className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-semibold text-graphite">
@@ -287,7 +352,7 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-line text-xs">
-                    <thead className="bg-slate-100 text-left text-[11px] font-bold uppercase text-graphite">
+                    <thead className="bg-red-100 text-left text-[11px] font-bold uppercase text-red-900">
                       <tr>
                         <th className="px-3 py-2.5">Cloud</th>
                         <th className="px-3 py-2.5">Service</th>
@@ -315,6 +380,8 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
                   </table>
                 </div>
               )}
+                </>
+              ) : null}
             </div>
           </div>
         </div>
@@ -393,6 +460,11 @@ function LandscapeCostModal({
   onClose: () => void;
 }) {
   const providers: Provider[] = ['azure', 'aws', 'gcp'];
+  const providerReviewCounts = providers.reduce<Record<Provider, number>>((counts, provider) => {
+    counts[provider] = rows.filter((row) => row.provider === provider && row.isGuidance).length;
+    return counts;
+  }, { azure: 0, aws: 0, gcp: 0 });
+  const totalReviewCount = providers.reduce((sum, provider) => sum + providerReviewCounts[provider], 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Landscape cost table">
@@ -407,7 +479,7 @@ function LandscapeCostModal({
               type="button"
               onClick={() => exportExcelFile(rows)}
               disabled={rows.length === 0}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 text-xs font-bold text-graphite transition hover:border-teal/30 hover:text-teal disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-600 px-2.5 text-xs font-bold text-white shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
             >
               <Download className="h-3.5 w-3.5" aria-hidden="true" />
               Export Excel
@@ -416,7 +488,7 @@ function LandscapeCostModal({
               type="button"
               onClick={() => exportPdfView(rows)}
               disabled={rows.length === 0}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 text-xs font-bold text-graphite transition hover:border-danger/30 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-600 bg-red-600 px-2.5 text-xs font-bold text-white shadow-sm transition hover:border-red-700 hover:bg-red-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
             >
               <FileText className="h-3.5 w-3.5" aria-hidden="true" />
               Export PDF
@@ -431,6 +503,11 @@ function LandscapeCostModal({
             </button>
           </div>
         </div>
+        {totalReviewCount > 0 ? (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs leading-5 text-amber-950">
+            <span className="font-bold">Review needed:</span> Some mapped, approximate, or not-calculated items should be checked before sharing this comparison with a client.
+          </div>
+        ) : null}
         <LandscapeTotalsBar providers={providers} estimates={estimates} position="top" />
         <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-4">
           <div className="grid min-w-[1180px] grid-cols-3 gap-3">
@@ -442,7 +519,14 @@ function LandscapeCostModal({
                   <div className="border-b border-lineSoft bg-navy px-3 py-2.5 text-white">
                     <div className="text-[11px] font-bold uppercase text-slate-300">Cloud</div>
                     <div className="mt-0.5 flex items-end justify-between gap-3">
-                      <h3 className="text-sm font-extrabold">{providerLabels[provider]}</h3>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-extrabold">{providerLabels[provider]}</h3>
+                        {providerReviewCounts[provider] > 0 ? (
+                          <span className="inline-flex rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-900">
+                            Review {providerReviewCounts[provider]}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-right text-sm font-extrabold">{estimate ? formatCurrency(estimate.totalMonthlyCost, estimate.currency) : 'Not calculated'}</div>
                     </div>
                   </div>
@@ -474,7 +558,10 @@ function LandscapeServiceRow({ row }: { row: DetailedCostRow }) {
   return (
     <div className={row.isGuidance ? 'grid grid-cols-[minmax(0,1fr)_118px] bg-amber-50/80 text-xs' : 'grid grid-cols-[minmax(0,1fr)_118px] text-xs'}>
       <div className="min-w-0 px-3 py-2.5">
-        <div className="font-bold text-navy">{row.serviceName}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="font-bold text-navy">{row.serviceName}</div>
+          {row.isGuidance ? <span className="rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-900">Review</span> : null}
+        </div>
         <div className={row.isGuidance ? 'mt-0.5 text-[11px] font-semibold text-warning' : 'mt-0.5 text-[11px] text-muted'}>{row.category}</div>
         <div className="mt-2 grid gap-1 text-[11px] leading-4 text-slate-700">
           <div>

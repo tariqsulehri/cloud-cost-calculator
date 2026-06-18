@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, GitCompareArrows } from 'lucide-react';
+import { useState } from 'react';
 import { buildCrossCloudMappingSummary, type CrossCloudMappingRow, type MappingStatus } from '../lib/crossCloudMapping';
 import { cn } from '../lib/utils';
 import type { NormalizedInfrastructureRequirement, Provider } from '../types/estimate';
@@ -21,15 +22,19 @@ const statusLabel: Record<MappingStatus, string> = {
 };
 
 const statusClass: Record<MappingStatus, string> = {
-  mapped: 'border-emerald-200 bg-emerald-50 text-success',
-  needs_review: 'border-amber-200 bg-amber-50 text-warning',
-  missing: 'border-red-200 bg-red-50 text-danger'
+  mapped: 'border-emerald-300 bg-emerald-100 text-emerald-800',
+  needs_review: 'border-amber-300 bg-amber-100 text-amber-900',
+  missing: 'border-red-300 bg-red-100 text-red-700'
 };
 
+type MappingFilter = 'all' | MappingStatus;
+
 export function CrossCloudMappingPanel({ requirements, baseProvider }: CrossCloudMappingPanelProps) {
+  const [filter, setFilter] = useState<MappingFilter>('all');
   const summary = buildCrossCloudMappingSummary(requirements, baseProvider);
-  const visibleRows = summary.rows.slice(0, 18);
-  const hiddenCount = Math.max(summary.rows.length - visibleRows.length, 0);
+  const filteredRows = summary.rows.filter((row) => rowMatchesFilter(row, filter));
+  const visibleRows = filteredRows.slice(0, 18);
+  const hiddenCount = Math.max(filteredRows.length - visibleRows.length, 0);
 
   return (
     <section className="overflow-hidden rounded-xl border border-line bg-panel shadow-card">
@@ -45,16 +50,21 @@ export function CrossCloudMappingPanel({ requirements, baseProvider }: CrossClou
               Base cloud: {providerLabels[baseProvider]}. The app maps these answers to equivalent Azure, AWS, and GCP fields before comparison.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-[11px]">
-            <Metric label="Mapped" value={summary.automaticCount} tone="success" />
-            <Metric label="Review" value={summary.needsReviewCount} tone="warning" />
-            <Metric label="Missing" value={summary.missingCount} tone="danger" />
+          <div className="grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+            <Metric label="All" value={summary.rows.length} tone="neutral" active={filter === 'all'} onClick={() => setFilter('all')} />
+            <Metric label="Mapped" value={summary.automaticCount} tone="success" active={filter === 'mapped'} onClick={() => setFilter('mapped')} />
+            <Metric label="Review" value={summary.needsReviewCount} tone="warning" active={filter === 'needs_review'} onClick={() => setFilter('needs_review')} />
+            <Metric label="Missing" value={summary.missingCount} tone="danger" active={filter === 'missing'} onClick={() => setFilter('missing')} />
           </div>
         </div>
       </div>
 
-      {summary.rows.length === 0 ? (
-        <p className="px-5 py-4 text-xs text-muted">No services are ready for cross-cloud mapping yet.</p>
+      <div className="border-b border-lineSoft bg-blue-50 px-5 py-2.5 text-xs leading-5 text-blue-950">
+        To see review items, click the amber <span className="font-bold">Review</span> box. Review rows mean the app mapped the service, but a cloud-specific choice should be checked before a client quote.
+      </div>
+
+      {filteredRows.length === 0 ? (
+        <p className="px-5 py-4 text-xs text-muted">No mapping rows match this filter.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-line text-xs">
@@ -91,8 +101,9 @@ export function CrossCloudMappingPanel({ requirements, baseProvider }: CrossClou
 }
 
 function MappingTableRow({ row, baseProvider, striped }: { row: CrossCloudMappingRow; baseProvider: Provider; striped: boolean }) {
+  const needsReview = Object.values(row.providerValues).some((value) => value.status === 'needs_review');
   return (
-    <tr className={striped ? 'bg-slate-50/60' : undefined}>
+    <tr className={needsReview ? 'bg-amber-50/35' : striped ? 'bg-slate-50/60' : undefined}>
       <td className="px-3 py-2.5">
         <div className="font-bold text-navy">{row.serviceName}</div>
         <div className="mt-0.5 text-[11px] capitalize text-muted">{row.serviceType.replace(/_/g, ' ')}</div>
@@ -120,19 +131,43 @@ function MappingTableRow({ row, baseProvider, striped }: { row: CrossCloudMappin
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: number; tone: 'success' | 'warning' | 'danger' }) {
+function Metric({
+  label,
+  value,
+  tone,
+  active,
+  onClick
+}: {
+  label: string;
+  value: number;
+  tone: 'neutral' | 'success' | 'warning' | 'danger';
+  active: boolean;
+  onClick: () => void;
+}) {
   const toneClass = {
-    success: 'bg-emerald-50 text-success',
-    warning: 'bg-amber-50 text-warning',
-    danger: 'bg-red-50 text-danger'
+    neutral: 'border-slate-200 bg-white text-slate-700',
+    success: 'border-emerald-300 bg-emerald-100 text-emerald-800',
+    warning: 'border-amber-300 bg-amber-100 text-amber-900',
+    danger: 'border-red-300 bg-red-100 text-red-700'
   }[tone];
 
   return (
-    <div className={cn('min-w-20 rounded-lg px-2.5 py-2 text-center', toneClass)}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn('min-w-20 rounded-lg border px-2.5 py-2 text-center transition hover:-translate-y-0.5 hover:shadow-cardHover', toneClass, active ? 'ring-2 ring-violet/30' : undefined)}
+    >
       <div className="text-base font-extrabold">{value}</div>
       <div className="text-[10px] font-bold uppercase">{label}</div>
-    </div>
+    </button>
   );
+}
+
+function rowMatchesFilter(row: CrossCloudMappingRow, filter: MappingFilter): boolean {
+  if (filter === 'all') {
+    return true;
+  }
+  return Object.values(row.providerValues).some((value) => value.status === filter);
 }
 
 function impactClass(impact: CrossCloudMappingRow['impact']): string {

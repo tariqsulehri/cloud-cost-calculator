@@ -1,5 +1,6 @@
 import { CloudCatalogDatabase, type ProviderServiceHints } from '../database/CloudCatalogDatabase.js';
-import type { NormalizedComponent, NormalizedComponentType, NormalizedInfrastructureRequirement } from '../types/estimate.types.js';
+import { mappedServiceKeyForComponent, providerHintsForComponent } from '../mappings/cloudServiceMap.js';
+import type { NormalizedComponent, NormalizedInfrastructureRequirement } from '../types/estimate.types.js';
 
 type ProviderServiceHint = NormalizedComponent['providerServiceHint'];
 
@@ -36,129 +37,7 @@ export class ServiceMappingService {
       return catalogHints;
     }
 
-    if (component.type === 'database' && 'engine' in component && component.engine === 'postgresql') {
-      return {
-        azure: 'Azure Database for PostgreSQL Flexible Server',
-        aws: 'Amazon RDS for PostgreSQL',
-        gcp: 'Cloud SQL for PostgreSQL'
-      };
-    }
-
-    if (component.type === 'cache' && 'engine' in component && component.engine === 'redis') {
-      return {
-        azure: 'Azure Cache for Redis',
-        aws: 'Amazon ElastiCache for Redis',
-        gcp: 'Memorystore for Redis'
-      };
-    }
-
-    if (component.type === 'load_balancer' && 'scheme' in component) {
-      if (component.scheme === 'http_s') {
-        return {
-          azure: 'Azure Application Gateway',
-          aws: 'Application Load Balancer',
-          gcp: 'External Application Load Balancer'
-        };
-      }
-
-      if (component.scheme === 'tcp') {
-        return {
-          azure: 'Azure Load Balancer',
-          aws: 'Network Load Balancer',
-          gcp: 'Network Load Balancer'
-        };
-      }
-    }
-
-    const hints: Record<NormalizedComponentType, ProviderServiceHint> = {
-      compute: {
-        azure: 'Virtual Machines',
-        aws: 'EC2',
-        gcp: 'Compute Engine'
-      },
-      database: {
-        azure: 'Azure SQL Database / Azure Database',
-        aws: 'Amazon RDS',
-        gcp: 'Cloud SQL'
-      },
-      cache: {
-        azure: 'Azure Cache for Redis',
-        aws: 'Amazon ElastiCache',
-        gcp: 'Memorystore'
-      },
-      storage: {
-        azure: 'Azure Storage',
-        aws: 'Amazon S3 / EBS / EFS',
-        gcp: 'Cloud Storage / Persistent Disk / Filestore'
-      },
-      object_storage: {
-        azure: 'Azure Blob Storage',
-        aws: 'Amazon S3',
-        gcp: 'Cloud Storage'
-      },
-      block_storage: {
-        azure: 'Azure Managed Disks',
-        aws: 'Amazon EBS',
-        gcp: 'Persistent Disk'
-      },
-      file_storage: {
-        azure: 'Azure Files',
-        aws: 'Amazon EFS',
-        gcp: 'Filestore'
-      },
-      cdn: {
-        azure: 'Azure CDN',
-        aws: 'Amazon CloudFront',
-        gcp: 'Cloud CDN'
-      },
-      load_balancer: {
-        azure: 'Azure Load Balancer / Application Gateway',
-        aws: 'Elastic Load Balancing',
-        gcp: 'Cloud Load Balancing'
-      },
-      kubernetes: {
-        azure: 'Azure Kubernetes Service (AKS)',
-        aws: 'Amazon EKS',
-        gcp: 'Google Kubernetes Engine'
-      },
-      serverless: {
-        azure: 'Azure Functions',
-        aws: 'AWS Lambda',
-        gcp: 'Cloud Functions / Cloud Run'
-      },
-      queue: {
-        azure: 'Azure Service Bus',
-        aws: 'Amazon SQS',
-        gcp: 'Pub/Sub'
-      },
-      monitoring: {
-        azure: 'Azure Monitor / Log Analytics',
-        aws: 'Amazon CloudWatch',
-        gcp: 'Cloud Monitoring'
-      },
-      backup: {
-        azure: 'Azure Backup',
-        aws: 'AWS Backup',
-        gcp: 'Backup and DR Service'
-      },
-      security: {
-        azure: 'Microsoft Defender for Cloud',
-        aws: 'AWS Security Hub',
-        gcp: 'Security Command Center'
-      },
-      network: {
-        azure: 'Azure Bandwidth / Virtual Network',
-        aws: 'Data Transfer / VPC',
-        gcp: 'Network Data Transfer / VPC'
-      },
-      unknown: {
-        azure: null,
-        aws: null,
-        gcp: null
-      }
-    };
-
-    return hints[component.type];
+    return providerHintsForComponent(component);
   }
 
   private catalogProviderServiceHint(component: NormalizedComponent): ProviderServiceHints | null {
@@ -170,29 +49,7 @@ export class ServiceMappingService {
   }
 
   private serviceKeyForComponent(component: NormalizedComponent): string {
-    if (component.type === 'database' && 'engine' in component && component.engine === 'postgresql') {
-      return 'database.postgresql';
-    }
-
-    if (component.type === 'cache' && 'engine' in component && component.engine === 'redis') {
-      return 'cache.redis';
-    }
-
-    if (component.type === 'load_balancer' && 'scheme' in component) {
-      if (component.scheme === 'http_s') {
-        return 'load_balancer.http_s';
-      }
-      if (component.scheme === 'tcp') {
-        return 'load_balancer.tcp';
-      }
-      return 'load_balancer.generic';
-    }
-
-    if (component.type === 'network') {
-      return 'network.egress';
-    }
-
-    return component.type;
+    return mappedServiceKeyForComponent(component);
   }
 
   private defaultName(component: NormalizedComponent): string {

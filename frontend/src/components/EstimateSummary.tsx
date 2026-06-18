@@ -15,6 +15,7 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
   const scopeNotes = estimateScopeNotes(estimate);
   const providerName = providerLabel(estimate.provider);
   const usesEarlyProposal = estimate.calculatedLineItems.some((item) => item.pricingSource === 'early-proposal-rate-card');
+  const usesAwsPublicPricing = estimate.calculatedLineItems.some((item) => item.pricingSource === 'aws-public-price-list');
   const chartData = estimate.calculatedLineItems.map((item) => ({
     name: item.serviceName.length > 18 ? `${item.serviceName.slice(0, 17)}…` : item.serviceName,
     fullName: item.serviceName,
@@ -153,7 +154,9 @@ export function EstimateSummary({ estimate }: EstimateSummaryProps) {
       <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs leading-5 text-amber-900">
         {usesEarlyProposal
           ? 'Estimate uses early proposal planning rates for this provider. Validate with the provider calculator or customer contract pricing before final quote.'
-          : 'Estimate uses Azure public retail pricing where implemented. Actual pricing may vary based on enterprise agreements, reservations, savings plans, taxes, region, and Azure calculator rounding.'}
+          : usesAwsPublicPricing
+            ? 'Estimate uses AWS public on-demand pricing where implemented. Actual pricing may vary based on reservations, savings plans, taxes, region, and AWS calculator rounding.'
+            : 'Estimate uses Azure public retail pricing where implemented. Actual pricing may vary based on enterprise agreements, reservations, savings plans, taxes, region, and Azure calculator rounding.'}
       </p>
       </div>
     </section>

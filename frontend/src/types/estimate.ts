@@ -6,7 +6,7 @@ export type Tier = 'standard';
 export type Category = 'all';
 export type PricingModel = 'pay-as-you-go';
 export type Confidence = 'low' | 'medium' | 'high';
-export type PricingSource = 'azure-retail-prices-api' | 'early-proposal-rate-card' | 'fallback';
+export type PricingSource = 'azure-retail-prices-api' | 'aws-public-price-list' | 'gcp-cloud-billing-pricing-api' | 'early-proposal-rate-card' | 'fallback';
 export type ExtractionMethod = 'llm' | 'rule-based-fallback';
 export type PricingStatus = 'supported' | 'not_implemented' | 'missing_required_fields' | 'unsupported' | 'needs_review';
 
@@ -196,4 +196,86 @@ export interface CatalogService {
   notes: string | null;
   aliases: string[];
   requiredFields: string[];
+}
+
+export interface CatalogSyncRunSummary {
+  id: number;
+  providerId: Provider;
+  source: string;
+  serviceCode: string | null;
+  regionCode: string | null;
+  status: string;
+  startedAt: string;
+  completedAt: string | null;
+  rowsRead: number;
+  rowsUpserted: number;
+  errorMessage: string | null;
+  metadata: unknown;
+}
+
+export interface AwsCatalogSyncStatus {
+  services: Array<{
+    offerCode: string;
+    regionCode: string;
+    meterCount: number;
+    latestRun: CatalogSyncRunSummary | null;
+  }>;
+}
+
+export interface AwsCatalogSyncAllResult {
+  status: 'completed' | 'partial';
+  results: Array<{
+    syncRunId: number;
+    status: 'completed' | 'partial';
+    offerCode: string;
+    regionCode: string;
+    publicationDate: string | null;
+    rowsRead: number;
+    rowsUpserted: number;
+  }>;
+}
+
+export interface AzureCatalogSyncStatus {
+  services: Array<{
+    serviceName: string;
+    armRegionName: string;
+    meterCount: number;
+    latestRun: CatalogSyncRunSummary | null;
+  }>;
+}
+
+export interface AzureCatalogSyncAllResult {
+  status: 'completed' | 'partial';
+  results: Array<{
+    syncRunId: number;
+    status: 'completed' | 'partial';
+    serviceName: string | null;
+    armRegionName: string;
+    pagesFetched: number;
+    itemsFetched: number;
+    rowsUpserted: number;
+    nextPageLink: string | null;
+  }>;
+}
+
+export interface GcpCatalogSyncStatus {
+  services: Array<{
+    serviceName: string;
+    regionCode: string;
+    meterCount: number;
+    latestRun: CatalogSyncRunSummary | null;
+  }>;
+}
+
+export interface GcpCatalogSyncAllResult {
+  status: 'completed' | 'partial';
+  results: Array<{
+    syncRunId: number;
+    status: 'completed' | 'partial';
+    serviceName: string;
+    serviceId: string;
+    regionCode: string;
+    skusRead: number;
+    rowsUpserted: number;
+  }>;
 }

@@ -38,6 +38,12 @@ export function pricingSourceLabel(source: PricingSource): string {
   if (source === 'azure-retail-prices-api') {
     return 'Azure price';
   }
+  if (source === 'aws-public-price-list') {
+    return 'AWS public price';
+  }
+  if (source === 'gcp-cloud-billing-pricing-api') {
+    return 'GCP public price';
+  }
   if (source === 'early-proposal-rate-card') {
     return 'Early proposal';
   }
@@ -48,6 +54,12 @@ export function pricingSourceDescription(source: PricingSource): string {
   if (source === 'azure-retail-prices-api') {
     return 'Price came from the Azure public pricing API.';
   }
+  if (source === 'aws-public-price-list') {
+    return 'Price came from AWS public on-demand price list data.';
+  }
+  if (source === 'gcp-cloud-billing-pricing-api') {
+    return 'Price came from Google Cloud Billing public pricing data.';
+  }
   if (source === 'early-proposal-rate-card') {
     return 'Planning rate only. Validate with provider calculator or contract pricing before final quote.';
   }
@@ -57,6 +69,12 @@ export function pricingSourceDescription(source: PricingSource): string {
 export function pricingSourceClass(source: PricingSource): string {
   if (source === 'azure-retail-prices-api') {
     return 'bg-blue-50 text-blue-700 border-blue-200';
+  }
+  if (source === 'aws-public-price-list') {
+    return 'bg-orange-50 text-orange-800 border-orange-200';
+  }
+  if (source === 'gcp-cloud-billing-pricing-api') {
+    return 'bg-emerald-50 text-emerald-800 border-emerald-200';
   }
   if (source === 'early-proposal-rate-card') {
     return 'bg-amber-50 text-amber-800 border-amber-200';

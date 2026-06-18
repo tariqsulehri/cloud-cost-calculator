@@ -1,13 +1,16 @@
 import { useRef, useState } from 'react';
-import { Bot, Calculator, CloudCog, GitCompareArrows } from 'lucide-react';
+import { Bot, Calculator, CloudCog, GitCompareArrows, ServerCog } from 'lucide-react';
 import { AiHelpTab } from './components/AiHelpTab';
+import { AwsCatalogOpsTab } from './components/AwsCatalogOpsTab';
 import { CalculateEstimateButton } from './components/CalculateEstimateButton';
 import { ClarifyingQuestionsPanel } from './components/ClarifyingQuestionsPanel';
 import { CompareEstimates } from './components/CompareEstimates';
 import { CrossCloudMappingPanel } from './components/CrossCloudMappingPanel';
+import { DocumentationTab } from './components/DocumentationTab';
 import { ErrorAlert } from './components/ErrorAlert';
 import { EstimateSummary } from './components/EstimateSummary';
 import { LoadingState } from './components/LoadingState';
+import { MagicPromptCreator } from './components/MagicPromptCreator';
 import { OptionalAddOnsPanel } from './components/OptionalAddOnsPanel';
 import { ProcessRail } from './components/ProcessRail';
 import { ProviderTabs, type ProviderTabKey } from './components/ProviderTabs';
@@ -28,7 +31,7 @@ A CDN for static assets, 1TB data transfer per month.
 Load balancer across both servers.
 All in US East region.`;
 
-type WorkspaceTab = 'estimate' | 'mapping' | 'ai';
+type WorkspaceTab = 'estimate' | 'mapping' | 'ops' | 'docs' | 'ai';
 
 const workspaceTabs: Array<{
   key: WorkspaceTab;
@@ -49,6 +52,12 @@ const workspaceTabs: Array<{
     icon: GitCompareArrows
   },
   {
+    key: 'ops',
+    label: 'Operations',
+    helper: 'Price sync',
+    icon: ServerCog
+  },
+  {
     key: 'ai',
     label: 'AI Help',
     helper: 'Plain English',
@@ -66,6 +75,7 @@ function App() {
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('estimate');
   const [selectedProvider, setSelectedProvider] = useState<ProviderTabKey>('azure');
   const [baseProvider, setBaseProvider] = useState<Provider>('azure');
+  const [showMagicPromptCreator, setShowMagicPromptCreator] = useState(false);
   const requirementTextRef = useRef(exampleRequirement);
   const extractRequestRef = useRef(0);
 
@@ -89,6 +99,10 @@ function App() {
     setExtractedPrompt(null);
     setEstimates({});
     setError(null);
+  }
+
+  function handleMagicPromptUse(prompt: string) {
+    handleRequirementTextChange(prompt);
   }
 
   async function handleExtract() {
@@ -238,7 +252,7 @@ function App() {
               <div>
                 <h1 className="text-2xl font-extrabold tracking-tight text-white">Cloud Cost Calculator</h1>
                 <p className="mt-0.5 max-w-3xl text-sm leading-5 text-slate-300">
-                  FinOps workspace for service review, pricing readiness, and multi-cloud mapping.
+                  Public cloud pricing estimates without sign-in, plus service review and multi-cloud mapping.
                 </p>
               </div>
             </div>
@@ -247,18 +261,25 @@ function App() {
                 <span className="h-1.5 w-1.5 rounded-full bg-tealSoft" />
                 Azure pricing active
               </span>
-              <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200">AWS/GCP early proposal</span>
+              <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200">AWS public EC2 pricing</span>
+              <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200">GCP early proposal</span>
             </div>
           </div>
         </header>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
-          <ProviderTabs selected={selectedProvider} baseProvider={baseProvider} estimates={estimates} onSelect={handleProviderSelect} />
+          <ProviderTabs
+            selected={selectedProvider}
+            baseProvider={baseProvider}
+            estimates={estimates}
+            onSelect={handleProviderSelect}
+            onOpenDocs={() => setWorkspaceTab('docs')}
+          />
           <ProcessRail hasRequirements={Boolean(requirements)} hasEstimate={hasAnyEstimate} />
         </div>
 
         <Tabs value={workspaceTab} onValueChange={(value) => setWorkspaceTab(value as WorkspaceTab)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             {workspaceTabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -283,6 +304,7 @@ function App() {
               onChange={handleRequirementTextChange}
               onExtract={handleExtract}
               onRefine={(value, provider) => refineRequirements(value, { provider })}
+              onOpenMagicPrompt={() => setShowMagicPromptCreator(true)}
             />
 
             <div className="space-y-4">
@@ -328,8 +350,13 @@ function App() {
         ) : null}
 
         {workspaceTab === 'mapping' ? <ServiceMappingTab /> : null}
+        {workspaceTab === 'ops' ? <AwsCatalogOpsTab /> : null}
+        {workspaceTab === 'docs' ? <DocumentationTab /> : null}
         {workspaceTab === 'ai' ? <AiHelpTab requirements={requirements} estimate={activeEstimate ?? estimates.azure ?? null} /> : null}
       </div>
+      {showMagicPromptCreator ? (
+        <MagicPromptCreator initialProvider={activeProvider} onClose={() => setShowMagicPromptCreator(false)} onUsePrompt={handleMagicPromptUse} />
+      ) : null}
     </main>
   );
 }
