@@ -134,7 +134,7 @@ export function AiArchitectureAdvisorModal({ initialProvider, onClose, onApplyPr
     lines.push(`- Main Relational Database: Managed ${specs.dbEngine} with ${specs.dbVcpu} vCPU, ${specs.dbRam} GB RAM, and ${specs.dbStorageGb} GB SSD Storage${specs.hasHa ? ' with High Availability (Automatic Failover Backup in second data center)' : ''}.`);
     lines.push(`- Fast Memory Cache: Managed Redis Cache with ${specs.redisGb} GB memory for fast web response.`);
     lines.push(`- File & Object Storage: Object Storage ${specs.objectStorageTb} TB capacity for file uploads and automated backups.`);
-    lines.push(`- Network & Content Delivery: 1x HTTP/S Load Balancer with ${specs.cdnEgressGb} GB Global CDN cache transfer.`);
+    lines.push(`- Network & Content Delivery: 1x HTTP/S Load Balancer with ${specs.cdnEgressGb} GB CDN monthly data transfer.`);
 
     if (compliance !== 'standard') {
       lines.push(`- Security & Compliance (${COMPLIANCE_LABELS[compliance].simple}): Include Enterprise Cloud Firewall, 1x NAT Gateway for secure outbound traffic, Key Vault secret management, and Central Audit Log Storage.`);

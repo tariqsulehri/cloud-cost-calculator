@@ -304,6 +304,8 @@ export class RequirementExtractionService {
     const cdnSegment = this.segmentFrom(text, /(cdn|static assets|content delivery)/);
     const transferGb = this.dataTransferGb(cdnSegment) ?? this.dataTransferGb(text);
     const requestCount = this.requestCount(cdnSegment) ?? this.requestCount(text);
+    const missingFields = [transferGb ? undefined : 'monthlyTransferGb'].filter((field): field is string => Boolean(field));
+
     return {
       id: 'cdn-1',
       type: 'cdn',
@@ -313,14 +315,14 @@ export class RequirementExtractionService {
         aws: 'Amazon CloudFront',
         gcp: 'Cloud CDN'
       },
-      pricingStatus: 'not_implemented',
+      pricingStatus: missingFields.length === 0 ? 'not_implemented' : 'missing_required_fields',
       rawText: cdnSegment,
       purpose: text.includes('static assets') ? 'static assets' : null,
       dataTransferGb: transferGb,
       monthlyTransferGb: transferGb,
       requestCount,
       confidence: transferGb ? 'high' : 'medium',
-      missingFields: [transferGb ? undefined : 'monthlyTransferGb'].filter((field): field is string => Boolean(field)),
+      missingFields,
       assumptions: ['Azure CDN Standard Microsoft pricing can be estimated from monthly transfer and request count.', '1 TB is normalized to 1024 GB.']
     };
   }
@@ -610,12 +612,14 @@ export class RequirementExtractionService {
   }
 
   private dataTransferGb(text: string): number | null {
-    const match = text.match(/(\d+(?:\.\d+)?)\s*(tb|gb)\s*(data transfer|transfer)/i) ?? text.match(/(?:data transfer|monthly transfer|transfer)\s*:\s*(\d+(?:\.\d+)?)\s*(tb|gb)/i);
-    if (!match) {
-      return null;
+    const match =
+      text.match(/(\d+(?:\.\d+)?)\s*(tb|gb)(?:\s+[a-z0-9\/-]+){0,5}\s*(data transfer|transfer|egress|cache transfer|cdn transfer)/i) ??
+      text.match(/(?:data transfer|monthly transfer|transfer|egress|cache transfer|cdn transfer)\s*:?\s*(\d+(?:\.\d+)?)\s*(tb|gb)/i);
+    if (match) {
+      const value = Number(match[1]);
+      return match[2].toLowerCase() === 'tb' ? value * 1024 : value;
     }
-    const value = Number(match[1]);
-    return match[2].toLowerCase() === 'tb' ? value * 1024 : value;
+    return this.dataSizeNear(text, /(cdn|content delivery|static assets|transfer|egress)/i);
   }
 
   private dataSizeNear(text: string, startPattern: RegExp): number | null {
