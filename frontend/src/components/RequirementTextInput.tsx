@@ -10,9 +10,10 @@ interface RequirementTextInputProps {
   onExtract: () => void;
   onRefine: (value: string, provider: Provider) => Promise<string>;
   onOpenMagicPrompt: () => void;
+  onOpenAiAdvisor?: () => void;
 }
 
-export function RequirementTextInput({ value, loading, provider, onChange, onExtract, onRefine, onOpenMagicPrompt }: RequirementTextInputProps) {
+export function RequirementTextInput({ value, loading, provider, onChange, onExtract, onRefine, onOpenMagicPrompt, onOpenAiAdvisor }: RequirementTextInputProps) {
   const [showRefinedPrompt, setShowRefinedPrompt] = useState(false);
   const [refinedPrompt, setRefinedPrompt] = useState('');
   const [refining, setRefining] = useState(false);
@@ -50,6 +51,16 @@ export function RequirementTextInput({ value, loading, provider, onChange, onExt
         />
       </label>
       <div className="mt-3 flex flex-wrap gap-2">
+        {onOpenAiAdvisor ? (
+          <button
+            type="button"
+            onClick={onOpenAiAdvisor}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-3.5 text-xs font-semibold text-blue-800 transition hover:border-blue-400 hover:bg-blue-100 shadow-sm"
+          >
+            <Sparkles className="h-4 w-4 text-azure" aria-hidden="true" />
+            🤖 AI Architect Advisor
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onOpenMagicPrompt}

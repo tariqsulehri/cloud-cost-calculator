@@ -19,6 +19,7 @@ import { RequirementTextInput } from './components/RequirementTextInput';
 import { AssumptionsPanel } from './components/AssumptionsPanel';
 import { CalculationCompletedModal } from './components/CalculationCompletedModal';
 import { PricingReadinessDialog, getRecommendedDefaults } from './components/PricingReadinessDialog';
+import { AiArchitectureAdvisorModal } from './components/AiArchitectureAdvisorModal';
 import { ServiceMappingTab } from './components/ServiceMappingTab';
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs';
 import { createNaturalLanguageEstimate, extractRequirements, getApiErrorMessage, refineRequirements } from './lib/api';
@@ -79,6 +80,7 @@ function App() {
   const [selectedProvider, setSelectedProvider] = useState<ProviderTabKey>('azure');
   const [baseProvider, setBaseProvider] = useState<Provider>('azure');
   const [showMagicPromptCreator, setShowMagicPromptCreator] = useState(false);
+  const [showAiAdvisorModal, setShowAiAdvisorModal] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showReadinessDialog, setShowReadinessDialog] = useState(false);
   const requirementTextRef = useRef(exampleRequirement);
@@ -374,6 +376,7 @@ function App() {
               onExtract={handleExtract}
               onRefine={(value, provider) => refineRequirements(value, { provider })}
               onOpenMagicPrompt={() => setShowMagicPromptCreator(true)}
+              onOpenAiAdvisor={() => setShowAiAdvisorModal(true)}
             />
 
             <div className="space-y-4">
@@ -446,6 +449,17 @@ function App() {
           handleExportProposal();
         }}
       />
+
+      {showAiAdvisorModal ? (
+        <AiArchitectureAdvisorModal
+          initialProvider={activeProvider}
+          onClose={() => setShowAiAdvisorModal(false)}
+          onApplyPrompt={(packedPrompt) => {
+            setRequirementText(packedPrompt);
+            handleRequirementTextChange(packedPrompt);
+          }}
+        />
+      ) : null}
 
       <PricingReadinessDialog
         isOpen={showReadinessDialog}
