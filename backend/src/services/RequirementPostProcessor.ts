@@ -143,6 +143,32 @@ export class RequirementPostProcessor {
       } as GenericComponent;
     }
 
+    if (component.type === 'monitoring') {
+      const monComp = component as GenericComponent;
+      const logIngestionGb = monComp.logIngestionGb ?? 100;
+      const retentionDays = monComp.retentionDays ?? 30;
+      return {
+        ...component,
+        logIngestionGb,
+        retentionDays,
+        pricingStatus: 'not_implemented',
+        missingFields: []
+      } as GenericComponent;
+    }
+
+    if (component.type === 'backup') {
+      const backupComp = component as GenericComponent;
+      const protectedDataGb = backupComp.protectedDataGb ?? 500;
+      const retentionDays = backupComp.retentionDays ?? 30;
+      return {
+        ...component,
+        protectedDataGb,
+        retentionDays,
+        pricingStatus: 'not_implemented',
+        missingFields: []
+      } as GenericComponent;
+    }
+
     return component;
   }
 
