@@ -622,6 +622,7 @@ export class PreliminaryCloudPricingService {
           continue;
         }
         const awsSqsPrice = provider === 'aws' ? await this.awsPricingService.getSqsStandardRequestPrice({ region }) : null;
+        const gcpPubSubPrice = provider === 'gcp' ? await this.gcpPricingService.getPubSubMessagePrice({ region, messageVolumeGb: Math.max(1, Math.ceil(messageVolume / 10000)) }) : null;
         if (awsSqsPrice) {
           calculatedLineItems.push(
             this.publicAwsLineItem(awsSqsPrice, {
@@ -631,6 +632,18 @@ export class PreliminaryCloudPricingService {
               hours: 1,
               usageLabel: `${messageVolume} request(s)`,
               assumption: `${awsSqsPrice.assumption} Calculation is ${messageVolume} request(s) x public standard request price. FIFO, payload size effects, data transfer, and extended client storage are excluded.`
+            })
+          );
+        } else if (gcpPubSubPrice) {
+          const volumeGb = Math.max(1, Math.ceil(messageVolume / 10000));
+          calculatedLineItems.push(
+            this.publicGcpLineItem(gcpPubSubPrice, {
+              category: 'Integration',
+              serviceName: this.serviceName(provider, component, 'Cloud Pub/Sub'),
+              quantity: volumeGb,
+              hours: 1,
+              usageLabel: `${volumeGb} GB ingestion/delivery`,
+              assumption: `${gcpPubSubPrice.assumption} Calculation applies GCP Pub/Sub data volume pricing.`
             })
           );
         } else {
@@ -686,6 +699,7 @@ export class PreliminaryCloudPricingService {
 
         const awsLambdaRequestPrice = provider === 'aws' && requestCount ? await this.awsPricingService.getLambdaRequestPrice({ region }) : null;
         const awsLambdaDurationPrice = provider === 'aws' && memoryGbSeconds ? await this.awsPricingService.getLambdaDurationPrice({ region }) : null;
+        const gcpCloudRunPrice = provider === 'gcp' ? await this.gcpPricingService.getCloudRunPrice({ region, vcpu: 1, memoryGb: 2 }) : null;
         if (awsLambdaRequestPrice || awsLambdaDurationPrice) {
           if (awsLambdaRequestPrice && requestCount) {
             calculatedLineItems.push(
@@ -711,6 +725,18 @@ export class PreliminaryCloudPricingService {
               })
             );
           }
+        } else if (gcpCloudRunPrice) {
+          const hours = 730;
+          calculatedLineItems.push(
+            this.publicGcpLineItem(gcpCloudRunPrice, {
+              category: 'Compute',
+              serviceName: this.serviceName(provider, component, 'Cloud Run'),
+              quantity: 1,
+              hours,
+              usageLabel: `1 serverless service x ${hours} hours`,
+              assumption: `${gcpCloudRunPrice.assumption}`
+            })
+          );
         } else {
           notImplementedLineItems.push({
             componentId: component.id,

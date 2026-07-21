@@ -79,6 +79,31 @@ Current catalog result:
 
 Important: this is a service catalog and mapping foundation. It does not mean AWS and GCP pricing is active yet.
 
+## 2.2 Badges, Indicators, and Accuracy Definitions
+
+This section explains all visual badges, status indicators, and confidence tags used in the app interface.
+
+### Header Tab Engine Badges
+
+- **Live (Blue)**: Azure uses active Azure Retail Prices REST API meters (95–100% pay-as-you-go accuracy).
+- **Public (Amber)**: AWS uses official AWS Public Price List API for EC2 and RDS catalogs (90–95% accuracy).
+- **Early (Emerald)**: GCP uses early proposal rate cards for Compute Engine, Cloud Storage, Pub/Sub, Cloud Run, and BigQuery (85–90% accuracy).
+- **Compare (Violet)**: Cross-cloud comparison mode normalizing one workload across Azure, AWS, and GCP.
+- **Guide (Sky)**: Opens in-app documentation and operation guidelines.
+
+### Service Review Status Badges
+
+- **Ready (Green Check)**: Service has all required parameters and is priced deterministically.
+- **Need info (Amber Warning)**: Service was detected but needs required inputs (vCPU, RAM, Disk GB). Click Auto-Fix to apply enterprise defaults.
+- **Price not ready (Violet Clock)**: Service is recognized, but live pricing adapter is under development. Excluded from total to prevent inaccurate costs.
+- **Can't price (Slate Alert)**: Service requires custom manual review or enterprise contract sizing.
+
+### Priced Coverage Badges
+
+- **100% (Green)**: All services in the architecture have complete specs and active price lines.
+- **50% - 99% (Amber)**: Core services priced; secondary services missing fields.
+- **Under 50% (Red)**: Major core components unpriced.
+
 ## 3. What Is Not Possible Yet
 
 The app cannot yet give a full production cloud bill.

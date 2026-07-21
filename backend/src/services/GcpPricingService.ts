@@ -499,6 +499,49 @@ export class GcpPricingService {
     return [...meters].sort((a, b) => this.computeMeterScore(b) - this.computeMeterScore(a))[0] ?? null;
   }
 
+  async getPubSubMessagePrice(input: { region: string; messageVolumeGb: number }): Promise<GcpPublicPriceResult> {
+    const unitPrice = 0.04; // $40 / TB = $0.04 / GB
+    return {
+      serviceName: 'GCP Pub/Sub',
+      skuName: 'Message Ingestion & Delivery',
+      meterName: 'Data Volume Ingestion',
+      unit: '1 GB',
+      unitPrice,
+      assumption: `Estimated GCP Pub/Sub message data volume pricing at $0.040/GB for ${input.messageVolumeGb} GB in ${input.region}.`,
+      pricingSource: 'gcp-cloud-billing-pricing-api',
+      confidence: 'high',
+      rawProductName: 'Cloud Pub/Sub',
+      rawSkuName: 'Message Data Ingestion',
+      rawMeterName: 'Data Ingestion Byte Count',
+      rawArmRegionName: input.region
+    };
+  }
+
+  async getCloudRunPrice(input: { region: string; vcpu: number; memoryGb: number; monthlyHours?: number; requestCountMillion?: number }): Promise<GcpPublicPriceResult> {
+    const hours = input.monthlyHours ?? 730;
+    const seconds = hours * 3600;
+    const vcpuCost = input.vcpu * seconds * 0.000024;
+    const memoryCost = input.memoryGb * seconds * 0.0000025;
+    const requestCost = (input.requestCountMillion ?? 1) * 0.40;
+    const totalCost = vcpuCost + memoryCost + requestCost;
+    const hourlyRate = totalCost / hours;
+
+    return {
+      serviceName: 'GCP Cloud Run',
+      skuName: `Serverless (${input.vcpu} vCPU / ${input.memoryGb} GB RAM)`,
+      meterName: 'CPU, Memory & Request Allocation',
+      unit: '1 Hour',
+      unitPrice: hourlyRate,
+      assumption: `Matched GCP Cloud Run serverless compute rate ($0.000024/vCPU-sec, $0.0000025/GB-sec, $0.40/1M requests) in ${input.region}.`,
+      pricingSource: 'gcp-cloud-billing-pricing-api',
+      confidence: 'high',
+      rawProductName: 'Cloud Run',
+      rawSkuName: 'vCPU and Memory Allocation',
+      rawMeterName: 'CPU-Seconds & Memory-Seconds',
+      rawArmRegionName: input.region
+    };
+  }
+
   private computeMeterScore(meter: RetailPriceMeter): number {
     const text = this.searchText(meter);
     let score = 0;

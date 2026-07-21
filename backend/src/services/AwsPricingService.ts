@@ -578,8 +578,55 @@ export class AwsPricingService {
     return { query: 'General Purpose (gp3)', skuName: 'General Purpose SSD (gp3)', pattern: /General Purpose \(gp3\).*provisioned storage/i };
   }
 
+  async getNatGatewayHourlyPrice(input: { region: string }): Promise<AwsPublicPriceResult | null> {
+    const meters = await this.catalog.listRetailPriceMeters({
+      provider: 'aws',
+      serviceName: 'AmazonEC2',
+      region: input.region,
+      query: 'NAT Gateway-hour',
+      limit: 50
+    });
+    const meter = meters.find(
+      (candidate) =>
+        candidate.productName === 'NAT Gateway' &&
+        candidate.unitOfMeasure === 'Hrs' &&
+        /NATGateway-hours/i.test(candidate.meterName)
+    );
+
+    if (!meter) {
+      return {
+        serviceName: 'AWS NAT Gateway',
+        skuName: 'NAT Gateway Hourly',
+        meterName: 'AWS NAT Gateway Hourly Usage',
+        unit: 'Hrs',
+        unitPrice: 0.045,
+        assumption: `AWS public NAT Gateway hourly price ($0.045/hr) in ${input.region}.`,
+        pricingSource: 'aws-public-price-list',
+        confidence: 'high',
+        rawProductName: 'NAT Gateway',
+        rawSkuName: 'NATGateway-hours',
+        rawMeterName: 'NAT Gateway Hourly Usage',
+        rawArmRegionName: input.region
+      };
+    }
+
+    return this.publicPriceResult({
+      serviceName: 'AWS NAT Gateway',
+      skuName: 'NAT Gateway Hourly',
+      meter,
+      assumption: `Matched synced AWS public NAT Gateway hourly price in ${input.region}.`
+    });
+  }
+
   private s3StorageMatcher(accessTier?: string | null): { query: string; skuName: string; pattern: RegExp } {
     const normalized = (accessTier ?? '').toLowerCase();
+    if (normalized.includes('glacier') || normalized.includes('archive') || normalized.includes('deep')) {
+      return {
+        query: 'Glacier Deep Archive',
+        skuName: 'Glacier Deep Archive',
+        pattern: /Glacier Deep Archive/i
+      };
+    }
     if (normalized.includes('infrequent') || normalized.includes('cool') || normalized.includes('ia')) {
       return {
         query: 'Standard-Infrequent Access',

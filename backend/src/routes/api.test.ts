@@ -513,6 +513,46 @@ describe('api routes', () => {
     expect(response.body.missingRequiredFieldLineItems.map((item: { type: string }) => item.type)).toEqual(['database', 'cache', 'load_balancer']);
   });
 
+  it('POST /api/estimate calculates Azure Managed Disks for block storage requirements', async () => {
+    const response = await invoke('POST', '/api/estimate', {
+      provider: 'azure',
+      requirements: {
+        region: {
+          raw: 'East US',
+          normalized: 'US East',
+          providerRegion: { azure: 'eastus', aws: 'us-east-1', gcp: 'us-east1' },
+          confidence: 'high'
+        },
+        components: [
+          {
+            id: 'disk-1',
+            type: 'block_storage',
+            name: 'Managed Disk',
+            diskSizeGb: 128,
+            tier: 'premium',
+            quantity: 2,
+            pricingStatus: 'supported',
+            confidence: 'high',
+            missingFields: [],
+            assumptions: [],
+            providerServiceHint: { azure: 'Managed Disks', aws: 'EBS', gcp: 'PD' },
+            rawText: '2x 128GB Premium SSD disks'
+          }
+        ],
+        globalAssumptions: [],
+        clarifyingQuestions: [],
+        extractionMethod: 'rule-based-fallback'
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.calculatedLineItems[0]).toMatchObject({
+      serviceName: 'Azure Managed Disks',
+      quantity: 2,
+      monthlyCost: 0.27
+    });
+  });
+
   it('POST /api/estimate returns AWS public EC2 pricing from mapped requirements', async () => {
     nock('https://pricing.us-east-1.amazonaws.com')
       .get('/offers/v1.0/aws/AmazonEC2/current/us-east-1/index.json')

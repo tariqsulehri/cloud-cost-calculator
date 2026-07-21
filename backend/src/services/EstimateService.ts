@@ -1,6 +1,10 @@
 import { AzurePricingService } from './AzurePricingService.js';
 import { PreliminaryCloudPricingService } from './PreliminaryCloudPricingService.js';
 import { roundMoney } from '../utils/money.js';
+import type { ICloudPricingAdapter } from './adapters/ICloudPricingAdapter.js';
+import { AzurePricingAdapter, type AzurePricingDelegate } from './adapters/AzurePricingAdapter.js';
+import { AwsPricingAdapter } from './adapters/AwsPricingAdapter.js';
+import { GcpPricingAdapter } from './adapters/GcpPricingAdapter.js';
 import type {
   EstimateLineItem,
   EstimateRequest,
@@ -10,14 +14,24 @@ import type {
   NormalizedEstimateRequest,
   NormalizedEstimateResponse,
   NotImplementedLineItem,
+  Provider,
   UnpricedLineItem
 } from '../types/estimate.types.js';
 
-export class EstimateService {
+export class EstimateService implements AzurePricingDelegate {
+  private readonly adapters: Record<Provider, ICloudPricingAdapter>;
+
   constructor(
     private readonly azurePricingService = new AzurePricingService(),
-    private readonly preliminaryCloudPricingService = new PreliminaryCloudPricingService()
-  ) {}
+    private readonly preliminaryCloudPricingService = new PreliminaryCloudPricingService(),
+    customAdapters?: Partial<Record<Provider, ICloudPricingAdapter>>
+  ) {
+    this.adapters = {
+      azure: customAdapters?.azure ?? new AzurePricingAdapter(this),
+      aws: customAdapters?.aws ?? new AwsPricingAdapter(this.preliminaryCloudPricingService),
+      gcp: customAdapters?.gcp ?? new GcpPricingAdapter(this.preliminaryCloudPricingService)
+    };
+  }
 
   async estimate(request: EstimateRequest): Promise<EstimateResponse> {
     const vmPrice = await this.azurePricingService.getVirtualMachineHourlyPrice({
@@ -66,9 +80,14 @@ export class EstimateService {
   }
 
   async estimateNormalized(request: NormalizedEstimateRequest): Promise<NormalizedEstimateResponse> {
-    if (request.provider !== 'azure') {
-      return await this.preliminaryCloudPricingService.estimateNormalized(request);
+    const adapter = this.adapters[request.provider];
+    if (adapter) {
+      return await adapter.estimateNormalized(request);
     }
+    return await this.estimateAzureNormalized(request);
+  }
+
+  async estimateAzureNormalized(request: NormalizedEstimateRequest): Promise<NormalizedEstimateResponse> {
 
     const region = request.requirements.region.providerRegion.azure;
     const calculatedLineItems: EstimateLineItem[] = [];
@@ -263,6 +282,46 @@ export class EstimateService {
         });
         pricedComponentIds.add(component.id);
         assumptions.push(blobAssumption);
+      } else if (component.type === 'block_storage') {
+        const diskSizeGb = this.numberValue(component, 'diskSizeGb') ?? this.numberValue(component, 'sizeGb') ?? this.numberValue(component, 'storageGb');
+        const diskTier = this.stringValue(component, 'tier') ?? this.stringValue(component, 'diskType') ?? 'premium';
+        const quantity = component.quantity ?? 1;
+
+        if (!diskSizeGb || component.pricingStatus === 'missing_required_fields') {
+          missingRequiredFieldLineItems.push(this.toUnpricedLineItem(component, 'Missing disk size in GB required for deterministic Managed Disk pricing.'));
+          continue;
+        }
+
+        const diskPrice = await this.azurePricingService.getManagedDiskMonthlyPrice({
+          region,
+          diskTier,
+          diskSizeGb
+        });
+
+        const monthlyCost = roundMoney(diskPrice.unitPrice * quantity);
+        const diskAssumption = `Managed Disk estimate is for ${quantity} x ${diskPrice.skuName} in ${region}. Managed snapshots and disk burst IOPS are excluded unless separately specified.`;
+
+        calculatedLineItems.push({
+          category: 'Storage',
+          serviceName: diskPrice.serviceName,
+          skuName: diskPrice.skuName,
+          meterName: diskPrice.meterName,
+          quantity,
+          hours: 1,
+          usageLabel: `${quantity} disk(s) (${diskSizeGb} GB)`,
+          unit: diskPrice.unit,
+          unitPrice: diskPrice.unitPrice,
+          monthlyCost,
+          assumption: `${diskPrice.assumption} ${diskAssumption}`,
+          pricingSource: diskPrice.pricingSource,
+          confidence: diskPrice.confidence,
+          rawProductName: diskPrice.rawProductName,
+          rawSkuName: diskPrice.rawSkuName,
+          rawMeterName: diskPrice.rawMeterName,
+          rawArmRegionName: diskPrice.rawArmRegionName
+        });
+        pricedComponentIds.add(component.id);
+        assumptions.push(diskAssumption);
       } else if (component.type === 'network') {
         const monthlyEgressGb = this.numberValue(component, 'monthlyEgressGb');
 

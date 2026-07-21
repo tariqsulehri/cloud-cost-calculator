@@ -2,6 +2,8 @@ import { AlertTriangle, CheckCircle2, CircleDollarSign, Cloud, CloudCog, Downloa
 import { useState } from 'react';
 import { coverageBadgeClass } from '../lib/coverageBadge';
 import { formatCurrency, pricingSourceClass, pricingSourceDescription, pricingSourceLabel } from '../lib/format';
+import { ProposalGenerator, type ProposalEstimateData } from '../lib/ProposalGenerator';
+import { MultiCloudTcoChart } from './MultiCloudTcoChart';
 import { InfoBadge } from './InfoBadge';
 import type { NaturalLanguageEstimateResponse, NormalizedComponentType, Provider } from '../types/estimate';
 
@@ -245,6 +247,8 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
           ) : null}
 
           <div className="grid gap-4">
+            <MultiCloudTcoChart estimates={estimates} />
+
             <div className="overflow-hidden rounded-lg border border-line bg-white">
               <div className="border-b border-lineSoft bg-slate-50 px-3.5 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -279,6 +283,24 @@ export function CompareEstimates({ estimates }: CompareEstimatesProps) {
                     >
                       <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                       Export PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportProposalMarkdown(estimates)}
+                      disabled={available.length === 0}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-purple-600 bg-purple-600 px-2.5 text-[11px] font-bold text-white shadow-sm transition hover:border-purple-700 hover:bg-purple-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
+                    >
+                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                      Proposal (.md)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportProposalPdf(estimates)}
+                      disabled={available.length === 0}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-teal bg-teal px-2.5 text-[11px] font-bold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
+                    >
+                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                      Proposal (PDF)
                     </button>
                   </div>
                 </div>
@@ -631,6 +653,86 @@ function exportExcelFile(rows: DetailedCostRow[]) {
 </body>
 </html>`;
   downloadTextFile('cloud-cost-comparison.xls', html, 'application/vnd.ms-excel;charset=utf-8');
+}
+
+function exportProposalMarkdown(estimates: Partial<Record<Provider, NaturalLanguageEstimateResponse>>) {
+  const providers: Provider[] = ['azure', 'aws', 'gcp'];
+  const proposalEstimates: ProposalEstimateData[] = [];
+
+  for (const provider of providers) {
+    const est = estimates[provider];
+    if (!est) continue;
+    const monthlyCost = est.totalMonthlyCost;
+    const annualCost = monthlyCost * 12;
+    proposalEstimates.push({
+      provider,
+      providerLabel: providerLabels[provider],
+      region: est.region,
+      monthlyCost,
+      annualCost,
+      oneYearRiMonthlyCost: monthlyCost * 0.7,
+      threeYearRiMonthlyCost: monthlyCost * 0.5,
+      confidence: est.confidence,
+      lineItemsCount: est.calculatedLineItems.length,
+      lineItems: est.calculatedLineItems.map((item) => ({
+        category: item.category,
+        serviceName: item.serviceName,
+        skuName: item.skuName,
+        monthlyCost: item.monthlyCost,
+        assumption: item.assumption
+      })),
+      assumptions: est.assumptions
+    });
+  }
+
+  const markdown = ProposalGenerator.generateMarkdownProposal({
+    requirementsSummary: 'Multi-cloud infrastructure review and proposal estimation',
+    estimates: proposalEstimates
+  });
+
+  downloadTextFile('cloud-cost-proposal.md', markdown, 'text/markdown');
+}
+
+function exportProposalPdf(estimates: Partial<Record<Provider, NaturalLanguageEstimateResponse>>) {
+  const providers: Provider[] = ['azure', 'aws', 'gcp'];
+  const proposalEstimates: ProposalEstimateData[] = [];
+
+  for (const provider of providers) {
+    const est = estimates[provider];
+    if (!est) continue;
+    const monthlyCost = est.totalMonthlyCost;
+    const annualCost = monthlyCost * 12;
+    proposalEstimates.push({
+      provider,
+      providerLabel: providerLabels[provider],
+      region: est.region,
+      monthlyCost,
+      annualCost,
+      oneYearRiMonthlyCost: monthlyCost * 0.7,
+      threeYearRiMonthlyCost: monthlyCost * 0.5,
+      confidence: est.confidence,
+      lineItemsCount: est.calculatedLineItems.length,
+      lineItems: est.calculatedLineItems.map((item) => ({
+        category: item.category,
+        serviceName: item.serviceName,
+        skuName: item.skuName,
+        monthlyCost: item.monthlyCost,
+        assumption: item.assumption
+      })),
+      assumptions: est.assumptions
+    });
+  }
+
+  const html = ProposalGenerator.generateHtmlProposal({
+    requirementsSummary: 'Multi-cloud infrastructure review and proposal estimation',
+    estimates: proposalEstimates
+  });
+
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
 }
 
 function exportPdfView(rows: DetailedCostRow[]) {

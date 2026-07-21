@@ -17,11 +17,14 @@ import { ProviderTabs, type ProviderTabKey } from './components/ProviderTabs';
 import { RequirementReview } from './components/RequirementReview';
 import { RequirementTextInput } from './components/RequirementTextInput';
 import { AssumptionsPanel } from './components/AssumptionsPanel';
+import { CalculationCompletedModal } from './components/CalculationCompletedModal';
+import { PricingReadinessDialog, getRecommendedDefaults } from './components/PricingReadinessDialog';
 import { ServiceMappingTab } from './components/ServiceMappingTab';
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs';
 import { createNaturalLanguageEstimate, extractRequirements, getApiErrorMessage, refineRequirements } from './lib/api';
 import { withCrossCloudMappingAssumption } from './lib/crossCloudMapping';
 import { isEstimableComponent } from './lib/pricingReadiness';
+import { ProposalGenerator } from './lib/ProposalGenerator';
 import type { NaturalLanguageEstimateResponse, NormalizedInfrastructureRequirement, Provider } from './types/estimate';
 
 const exampleRequirement = `I need 2 web servers with 4 vCPU and 16GB RAM each, running Linux Ubuntu.
@@ -76,6 +79,8 @@ function App() {
   const [selectedProvider, setSelectedProvider] = useState<ProviderTabKey>('azure');
   const [baseProvider, setBaseProvider] = useState<Provider>('azure');
   const [showMagicPromptCreator, setShowMagicPromptCreator] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showReadinessDialog, setShowReadinessDialog] = useState(false);
   const requirementTextRef = useRef(exampleRequirement);
   const extractRequestRef = useRef(0);
 
@@ -84,6 +89,65 @@ function App() {
   const activeProvider = selectedProvider === 'compare' ? baseProvider : selectedProvider;
   const activeEstimate = selectedProvider === 'compare' ? null : estimates[activeProvider];
   const hasAnyEstimate = Object.values(estimates).some(Boolean);
+
+  function handleAutoFixComponent(componentId: string, defaults: Record<string, unknown>) {
+    handleComponentUpdate(componentId, defaults);
+  }
+
+  function handleAutoFixAll() {
+    if (!requirements) return;
+    for (const comp of requirements.components) {
+      if (comp.missingFields.length > 0 || comp.pricingStatus === 'missing_required_fields') {
+        const defaults = getRecommendedDefaults(comp);
+        handleComponentUpdate(comp.id, defaults);
+      }
+    }
+  }
+
+  function handleExportProposal() {
+    const providers: Provider[] = ['azure', 'aws', 'gcp'];
+    const proposalEstimates = [];
+
+    for (const p of providers) {
+      const est = estimates[p];
+      if (!est) continue;
+      const monthlyCost = est.totalMonthlyCost;
+      proposalEstimates.push({
+        provider: p,
+        providerLabel: providerLabel(p),
+        region: est.region,
+        monthlyCost,
+        annualCost: monthlyCost * 12,
+        oneYearRiMonthlyCost: monthlyCost * 0.7,
+        threeYearRiMonthlyCost: monthlyCost * 0.5,
+        confidence: est.confidence,
+        lineItemsCount: est.calculatedLineItems.length,
+        lineItems: est.calculatedLineItems.map((item) => ({
+          category: item.category,
+          serviceName: item.serviceName,
+          skuName: item.skuName,
+          monthlyCost: item.monthlyCost,
+          assumption: item.assumption
+        })),
+        assumptions: est.assumptions
+      });
+    }
+
+    const markdown = ProposalGenerator.generateMarkdownProposal({
+      requirementsSummary: requirementText,
+      estimates: proposalEstimates
+    });
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'cloud-cost-proposal.md';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
 
   function handleProviderSelect(provider: ProviderTabKey) {
     setSelectedProvider(provider);
@@ -163,6 +227,7 @@ function App() {
         });
         setEstimates((current) => ({ ...current, [selectedProvider]: result }));
       }
+      setShowCompletionModal(true);
     } catch (estimateError) {
       setError(getApiErrorMessage(estimateError));
     } finally {
@@ -236,6 +301,10 @@ function App() {
       };
     });
     setEstimates({});
+  }
+
+  function handleComponentRemove(componentId: string) {
+    handleOptionalAddOnRemove(componentId);
   }
 
   return (
@@ -312,7 +381,13 @@ function App() {
               {loading ? <LoadingState /> : null}
               {requirements ? (
                 <>
-                  <RequirementReview requirements={requirements} provider={selectedProvider} onComponentUpdate={handleComponentUpdate} />
+                  <RequirementReview
+                    requirements={requirements}
+                    provider={selectedProvider}
+                    onComponentUpdate={handleComponentUpdate}
+                    onComponentRemove={handleComponentRemove}
+                    onOpenReadinessDialog={() => setShowReadinessDialog(true)}
+                  />
                   {selectedProvider === 'azure' ? (
                     <OptionalAddOnsPanel
                       components={requirements.components}
@@ -354,9 +429,33 @@ function App() {
         {workspaceTab === 'docs' ? <DocumentationTab /> : null}
         {workspaceTab === 'ai' ? <AiHelpTab requirements={requirements} estimate={activeEstimate ?? estimates.azure ?? null} /> : null}
       </div>
+
       {showMagicPromptCreator ? (
         <MagicPromptCreator initialProvider={activeProvider} onClose={() => setShowMagicPromptCreator(false)} onUsePrompt={handleMagicPromptUse} />
       ) : null}
+
+      <CalculationCompletedModal
+        isOpen={showCompletionModal}
+        estimate={activeEstimate ?? estimates.azure ?? estimates.aws ?? estimates.gcp ?? null}
+        provider={activeProvider}
+        onClose={() => setShowCompletionModal(false)}
+        onViewDetails={() => {
+          setSelectedProvider('compare');
+        }}
+        onExportProposal={() => {
+          handleExportProposal();
+        }}
+      />
+
+      <PricingReadinessDialog
+        isOpen={showReadinessDialog}
+        requirements={requirements}
+        provider={activeProvider}
+        onClose={() => setShowReadinessDialog(false)}
+        onAutoFixComponent={handleAutoFixComponent}
+        onAutoFixAll={handleAutoFixAll}
+        onRemoveComponent={handleComponentRemove}
+      />
     </main>
   );
 }

@@ -383,6 +383,65 @@ describe('PreliminaryCloudPricingService', () => {
       ])
     );
   });
+
+  it('calculates GCP Pub/Sub and Cloud Run pricing for GCP requirements', async () => {
+    const service = new PreliminaryCloudPricingService();
+    const request: NormalizedEstimateRequest = {
+      provider: 'gcp',
+      requirements: {
+        region: {
+          raw: 'us-central1',
+          normalized: 'us-central1',
+          providerRegion: { azure: 'eastus', aws: 'us-east-1', gcp: 'us-central1' },
+          confidence: 'high'
+        },
+        components: [
+          {
+            id: 'pubsub-1',
+            type: 'queue',
+            name: 'Pub/Sub queue',
+            providerServiceHint: { azure: 'Service Bus', aws: 'SQS', gcp: 'Pub/Sub' },
+            pricingStatus: 'supported',
+            confidence: 'high',
+            missingFields: [],
+            assumptions: [],
+            rawText: '10 million messages',
+            messageVolume: 10_000_000
+          },
+          {
+            id: 'run-1',
+            type: 'serverless',
+            name: 'Cloud Run service',
+            providerServiceHint: { azure: 'Functions', aws: 'Lambda', gcp: 'Cloud Run' },
+            pricingStatus: 'supported',
+            confidence: 'high',
+            missingFields: [],
+            assumptions: [],
+            rawText: '1 million Cloud Run requests',
+            requestCount: 1_000_000
+          }
+        ],
+        globalAssumptions: [],
+        clarifyingQuestions: [],
+        extractionMethod: 'rule-based-fallback'
+      }
+    };
+
+    const result = await service.estimateNormalized(request);
+
+    expect(result.provider).toBe('gcp');
+    expect(result.calculatedLineItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceName: 'Pub/Sub',
+          monthlyCost: 40
+        }),
+        expect.objectContaining({
+          serviceName: 'Cloud Run'
+        })
+      ])
+    );
+  });
 });
 
 function meter(input: {

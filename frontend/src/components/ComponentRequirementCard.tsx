@@ -1,14 +1,16 @@
-import { ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock3, WandSparkles } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock3, Sparkles, Trash2, WandSparkles } from 'lucide-react';
 import { useState, type KeyboardEvent } from 'react';
 import { confidenceClass, confidenceDescription, confidenceLabel } from '../lib/format';
 import { reviewStatusForComponent, type ReviewStatus } from '../lib/pricingReadiness';
 import { InfoBadge } from './InfoBadge';
+import { getRecommendedDefaults } from './PricingReadinessDialog';
 import type { NormalizedComponent, Provider } from '../types/estimate';
 
 interface ComponentRequirementCardProps {
   component: NormalizedComponent;
   provider: Provider | 'compare';
   onUpdate: (componentId: string, updates: Record<string, unknown>) => void;
+  onRemove?: (componentId: string) => void;
 }
 
 type ReviewFieldKind = 'number' | 'text' | 'boolean' | 'select';
@@ -29,7 +31,7 @@ interface ReviewField {
   options?: ReviewFieldOption[];
 }
 
-export function ComponentRequirementCard({ component, provider, onUpdate }: ComponentRequirementCardProps) {
+export function ComponentRequirementCard({ component, provider, onUpdate, onRemove }: ComponentRequirementCardProps) {
   const [expanded, setExpanded] = useState(component.missingFields.length > 0);
   const status = reviewStatusForComponent(component, provider);
   const Icon = statusIcon(status);
@@ -83,6 +85,31 @@ export function ComponentRequirementCard({ component, provider, onUpdate }: Comp
               ))}
             </ul>
           ) : null}
+
+          {/* Quick Action Toolbar */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-lineSoft pt-3">
+            {onRemove ? (
+              <button
+                type="button"
+                onClick={() => onRemove(component.id)}
+                className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 py-1 text-[11px] font-bold text-red-600 shadow-sm transition hover:bg-red-50"
+              >
+                <Trash2 className="h-3 w-3" aria-hidden="true" />
+                Remove from Request
+              </button>
+            ) : null}
+
+            {component.missingFields.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => onUpdate(component.id, getRecommendedDefaults(component))}
+                className="inline-flex items-center gap-1.5 rounded-md bg-teal px-2.5 py-1 text-[11px] font-bold text-white shadow-sm transition hover:brightness-110"
+              >
+                <Sparkles className="h-3 w-3" aria-hidden="true" />
+                Fix & Fill Defaults
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </article>

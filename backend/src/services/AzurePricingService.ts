@@ -369,6 +369,60 @@ export class AzurePricingService {
     });
   }
 
+  async getManagedDiskMonthlyPrice(input: { region: string; diskTier?: string; diskSizeGb: number }): Promise<AzureMeterPriceResult> {
+    const tier = (input.diskTier ?? 'premium').toLowerCase();
+    const diskSizeGb = input.diskSizeGb;
+
+    let diskSku = 'P10';
+    if (diskSizeGb <= 32) diskSku = 'P4';
+    else if (diskSizeGb <= 64) diskSku = 'P6';
+    else if (diskSizeGb <= 128) diskSku = 'P10';
+    else if (diskSizeGb <= 256) diskSku = 'P15';
+    else if (diskSizeGb <= 512) diskSku = 'P20';
+    else if (diskSizeGb <= 1024) diskSku = 'P30';
+    else if (diskSizeGb <= 2048) diskSku = 'P40';
+    else diskSku = 'P50';
+
+    const productName = tier.includes('standard') ? 'Standard SSD Managed Disks' : 'Premium SSD Managed Disks';
+    const meterName = `${diskSku} Disk`;
+
+    const records = await this.findExactMeter({
+      region: input.region,
+      serviceName: 'Storage',
+      productName,
+      skuName: diskSku,
+      meterName,
+      unitOfMeasure: '1/Month'
+    });
+
+    if (records.length === 0) {
+      const unitPrice = tier.includes('standard') ? 0.075 : 0.135;
+      return {
+        serviceName: 'Azure Managed Disks',
+        skuName: `${diskSku} (${diskSizeGb} GB)`,
+        meterName,
+        unit: '1 GB/Month',
+        unitPrice,
+        tiers: [{ tierMinimumUnits: 0, unitPrice }],
+        assumption: `Estimated Azure ${tier.includes('standard') ? 'Standard' : 'Premium'} SSD disk pricing for ${diskSizeGb} GB in ${input.region}.`,
+        pricingSource: 'fallback',
+        confidence: 'medium',
+        rawProductName: productName,
+        rawSkuName: diskSku,
+        rawMeterName: meterName,
+        rawArmRegionName: input.region
+      };
+    }
+
+    return this.toMeterPriceResult({
+      serviceName: 'Azure Managed Disks',
+      skuName: `${diskSku} (${diskSizeGb} GB)`,
+      meterName,
+      records,
+      assumption: `Matched Azure Retail Prices API ${productName} meter for ${diskSku} in ${input.region}.`
+    });
+  }
+
   async getServiceBusBasePrice(input: { region: string; tier: string }): Promise<AzureMeterPriceResult> {
     const tier = this.titleCase(input.tier);
     const meterName = tier === 'Premium' ? 'Premium Messaging Unit' : `${tier} Base Unit`;

@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, Globe2, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, Clock3, Globe2, HelpCircle, ShieldAlert, TriangleAlert } from 'lucide-react';
 import { ComponentRequirementCard } from './ComponentRequirementCard';
 import { InfoBadge } from './InfoBadge';
 import { reviewStatusForComponent } from '../lib/pricingReadiness';
@@ -9,9 +9,17 @@ interface RequirementReviewProps {
   requirements: NormalizedInfrastructureRequirement;
   provider: Provider | 'compare';
   onComponentUpdate: (componentId: string, updates: Record<string, unknown>) => void;
+  onComponentRemove?: (componentId: string) => void;
+  onOpenReadinessDialog?: () => void;
 }
 
-export function RequirementReview({ requirements, provider, onComponentUpdate }: RequirementReviewProps) {
+export function RequirementReview({
+  requirements,
+  provider,
+  onComponentUpdate,
+  onComponentRemove,
+  onOpenReadinessDialog
+}: RequirementReviewProps) {
   const extractionLabel = requirements.extractionMethod === 'llm' ? 'AI-assisted' : 'Rule-based fallback';
   const providerContext = providerReviewContext(provider, requirements);
   const reviewableComponents = requirements.components.filter((component) => !component.optionalAddon);
@@ -25,17 +33,29 @@ export function RequirementReview({ requirements, provider, onComponentUpdate }:
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-navy">Step 2: Review services</h2>
-            <p className="mt-0.5 text-xs text-muted">Check services and fill only missing values.</p>
+            <p className="mt-0.5 text-xs text-muted">Check services and fill missing values before pricing.</p>
           </div>
-          <InfoBadge
-            label={extractionLabel}
-            tooltip={
-              requirements.extractionMethod === 'llm'
-                ? 'AI read your text and found cloud services.'
-                : 'The app used simple rules because AI was not available.'
-            }
-            className="border-violet/20 bg-violet/10 text-violet"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenReadinessDialog && (
+              <button
+                type="button"
+                onClick={onOpenReadinessDialog}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-[11px] font-bold text-blue-900 shadow-sm transition hover:bg-blue-100"
+              >
+                <ShieldAlert className="h-3.5 w-3.5 text-blue-700" />
+                Readiness & Accuracy Guidelines
+              </button>
+            )}
+            <InfoBadge
+              label={extractionLabel}
+              tooltip={
+                requirements.extractionMethod === 'llm'
+                  ? 'AI read your text and found cloud services.'
+                  : 'The app used simple rules because AI was not available.'
+              }
+              className="border-violet/20 bg-violet/10 text-violet"
+            />
+          </div>
         </div>
       </div>
 
@@ -62,6 +82,7 @@ export function RequirementReview({ requirements, provider, onComponentUpdate }:
           provider={provider}
           emptyText="No supported pricing components detected yet."
           onComponentUpdate={onComponentUpdate}
+          onComponentRemove={onComponentRemove}
         />
         <ComponentGroup
           title="Detected, price not ready"
@@ -69,6 +90,7 @@ export function RequirementReview({ requirements, provider, onComponentUpdate }:
           provider={provider}
           emptyText="No unpriced detected services."
           onComponentUpdate={onComponentUpdate}
+          onComponentRemove={onComponentRemove}
         />
         {reviewComponents.length > 0 ? (
           <ComponentGroup
@@ -77,6 +99,7 @@ export function RequirementReview({ requirements, provider, onComponentUpdate }:
             provider={provider}
             emptyText="No components need review."
             onComponentUpdate={onComponentUpdate}
+            onComponentRemove={onComponentRemove}
           />
         ) : null}
       </div>
@@ -153,13 +176,15 @@ function ComponentGroup({
   components,
   provider,
   emptyText,
-  onComponentUpdate
+  onComponentUpdate,
+  onComponentRemove
 }: {
   title: string;
   components: NormalizedInfrastructureRequirement['components'];
   provider: Provider | 'compare';
   emptyText: string;
   onComponentUpdate: (componentId: string, updates: Record<string, unknown>) => void;
+  onComponentRemove?: (componentId: string) => void;
 }) {
   return (
     <div className="mt-4">
@@ -172,7 +197,13 @@ function ComponentGroup({
       ) : (
         <div className="mt-2.5 grid gap-2.5">
           {components.map((component) => (
-            <ComponentRequirementCard key={component.id} component={component} provider={provider} onUpdate={onComponentUpdate} />
+            <ComponentRequirementCard
+              key={component.id}
+              component={component}
+              provider={provider}
+              onUpdate={onComponentUpdate}
+              onRemove={onComponentRemove}
+            />
           ))}
         </div>
       )}
